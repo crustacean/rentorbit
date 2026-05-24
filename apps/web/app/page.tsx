@@ -1,5 +1,5 @@
-import { MarketplaceExperience } from "@/components/MarketplaceExperience";
+import { HomeLanding } from "@/components/HomeLanding";
 
 export default function Home() {
-  return <MarketplaceExperience />;
+  return <HomeLanding />;
 }
