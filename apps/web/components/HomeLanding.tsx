@@ -2,7 +2,7 @@
 
 import { ArrowLeft, ArrowRight, BadgeCheck, Camera, Drill, Headphones, LogIn, Search, Sparkles, UserPlus } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 type OfferingKey = "goods" | "personnel" | "services";
 
@@ -319,16 +319,28 @@ export function HomeLanding() {
 
 function OfferingPhone({ offering }: { offering: Offering }) {
   const [activeIndex, setActiveIndex] = useState(0);
+  const [isFading, setIsFading] = useState(false);
+  const fadeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const viewAllIndex = offering.listings.length;
+  const isViewAllPage = activeIndex === viewAllIndex;
   const stackListings = [0, 1, 2].map((offset) => offering.listings[(activeIndex + offset) % offering.listings.length]);
 
   function scrollByCard(direction: "left" | "right") {
-    setActiveIndex((current) => {
-      if (direction === "left") {
-        return current === 0 ? offering.listings.length - 1 : current - 1;
-      }
+    if (fadeTimer.current) {
+      clearTimeout(fadeTimer.current);
+    }
 
-      return (current + 1) % offering.listings.length;
-    });
+    setIsFading(true);
+    fadeTimer.current = setTimeout(() => {
+      setActiveIndex((current) => {
+        if (direction === "left") {
+          return current === 0 ? viewAllIndex : current - 1;
+        }
+
+        return current === viewAllIndex ? 0 : current + 1;
+      });
+      setIsFading(false);
+    }, 180);
   }
 
   return (
@@ -352,16 +364,22 @@ function OfferingPhone({ offering }: { offering: Offering }) {
         </div>
 
         <div
-          className="absolute left-1/2 top-[18%] z-20 h-[70%] w-[min(82%,360px)] -translate-x-1/2 opacity-0 transition duration-300 group-hover:opacity-100"
+          className={`absolute left-1/2 top-[18%] z-20 h-[70%] w-[clamp(280px,72%,520px)] -translate-x-1/2 opacity-0 transition duration-300 ${
+            isFading ? "scale-[0.96] group-hover:opacity-0" : "scale-100 group-hover:opacity-100"
+          }`}
           aria-label={`${offering.title} sample listings`}
         >
-          {stackListings.map((listing, index) =>
-            listing ? <StackedListingPreview key={`${listing.title}-${index}`} listing={listing} index={index} /> : null
+          {isViewAllPage ? (
+            <ViewAllStack offering={offering} />
+          ) : (
+            stackListings.map((listing, index) =>
+              listing ? <StackedListingPreview key={`${listing.title}-${activeIndex}-${index}`} listing={listing} index={index} /> : null
+            )
           )}
         </div>
 
         <div className="absolute inset-x-4 bottom-4 z-30 translate-y-5 opacity-0 transition duration-300 group-hover:translate-y-0 group-hover:opacity-100">
-          <div className="flex h-[75px] items-center justify-between rounded-full bg-[#e8e6e3]/85 p-[3px] backdrop-blur-md">
+          <div className="mx-auto flex h-[75px] w-[clamp(280px,88%,620px)] items-center justify-between rounded-full bg-[#e8e6e3]/85 p-[3px] backdrop-blur-md">
             <button
               onClick={() => scrollByCard("left")}
               className="inline-flex h-full aspect-square shrink-0 items-center justify-center rounded-full bg-[#f7f6f3] p-[0.5%] text-orbit-ink"
@@ -369,7 +387,7 @@ function OfferingPhone({ offering }: { offering: Offering }) {
             >
               <ArrowLeft className="h-5 w-5" aria-hidden="true" />
             </button>
-            <span className="text-[18px] font-semibold text-orbit-ink">Slide left and right</span>
+            <span className="text-[18px] font-semibold text-orbit-ink">{isViewAllPage ? "View all listings" : "Slide left and right"}</span>
             <button
               onClick={() => scrollByCard("right")}
               className="inline-flex h-full aspect-square shrink-0 items-center justify-center rounded-full bg-black p-[0.5%] text-white"
@@ -406,6 +424,23 @@ function StackedListingPreview({ listing, index }: { listing: ListingCard; index
         <h4 className="line-clamp-2 text-base font-black text-orbit-ink">{listing.title}</h4>
         <p className="truncate text-sm font-semibold text-neutral-500">{listing.area}</p>
       </div>
+    </Link>
+  );
+}
+
+function ViewAllStack({ offering }: { offering: Offering }) {
+  return (
+    <Link
+      href={`/marketplace?offering=${offering.key}`}
+      className="absolute inset-x-0 top-0 z-30 flex h-[78%] flex-col items-center justify-center overflow-hidden rounded-[30px] bg-white/95 p-6 text-center shadow-[0_18px_45px_rgba(0,0,0,0.2)] backdrop-blur"
+    >
+      <span className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full bg-orbit-green text-white">{offering.icon}</span>
+      <span className="text-3xl font-black text-orbit-ink">View all</span>
+      <span className="mt-2 text-base font-semibold text-neutral-600">{offering.title} listings across Kenya</span>
+      <span className="mt-6 inline-flex items-center gap-2 rounded-full bg-black px-5 py-3 text-sm font-black text-white">
+        Open marketplace
+        <ArrowRight className="h-4 w-4" aria-hidden="true" />
+      </span>
     </Link>
   );
 }
