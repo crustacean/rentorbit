@@ -306,7 +306,7 @@ export function HomeLanding() {
             </Link>
           </div>
 
-          <div className="grid gap-5 xl:grid-cols-3">
+          <div className="mx-auto grid w-full gap-5 lg:w-4/5 xl:grid-cols-3">
             {offerings.map((offering) => (
               <OfferingPhone key={offering.key} offering={offering} />
             ))}
@@ -328,7 +328,7 @@ function OfferingPhone({ offering }: { offering: Offering }) {
   }
 
   return (
-    <article className="group relative h-[720px] overflow-hidden rounded-[42px] border border-white/70 bg-white p-4 shadow-panel transition duration-300 hover:translate-y-3 hover:shadow-none sm:h-[760px]">
+    <article className="group relative h-[80svh] min-h-[640px] overflow-hidden rounded-[34px] bg-transparent shadow-[0_2px_12px_rgba(25,32,29,0.24)] transition duration-300 hover:translate-y-3">
       <div className="relative h-full overflow-hidden rounded-[34px] bg-neutral-200">
         <img src={offering.image} alt={`${offering.title} rentals`} className="absolute inset-0 h-full w-full object-cover" />
         <div className="absolute inset-0 bg-black/25 transition duration-300 group-hover:bg-black/45" />
