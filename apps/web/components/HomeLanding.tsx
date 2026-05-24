@@ -323,9 +323,15 @@ function OfferingPhone({ offering }: { offering: Offering }) {
   const fadeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const viewAllIndex = offering.listings.length;
   const isViewAllPage = activeIndex === viewAllIndex;
-  const stackListings = [0, 1, 2].map((offset) => offering.listings[(activeIndex + offset) % offering.listings.length]);
+  const canSlideLeft = activeIndex > 0;
+  const canSlideRight = activeIndex < viewAllIndex;
+  const stackListings = [0, 1, 2].map((offset) => offering.listings[activeIndex + offset]);
 
   function scrollByCard(direction: "left" | "right") {
+    if ((direction === "left" && !canSlideLeft) || (direction === "right" && !canSlideRight)) {
+      return;
+    }
+
     if (fadeTimer.current) {
       clearTimeout(fadeTimer.current);
     }
@@ -334,10 +340,10 @@ function OfferingPhone({ offering }: { offering: Offering }) {
     fadeTimer.current = setTimeout(() => {
       setActiveIndex((current) => {
         if (direction === "left") {
-          return current === 0 ? viewAllIndex : current - 1;
+          return Math.max(0, current - 1);
         }
 
-        return current === viewAllIndex ? 0 : current + 1;
+        return Math.min(viewAllIndex, current + 1);
       });
       setIsFading(false);
     }, 180);
@@ -382,7 +388,8 @@ function OfferingPhone({ offering }: { offering: Offering }) {
           <div className="mx-auto flex h-[75px] w-[clamp(280px,88%,620px)] items-center justify-between rounded-full bg-[#e8e6e3]/85 p-[3px] backdrop-blur-md">
             <button
               onClick={() => scrollByCard("left")}
-              className="inline-flex h-full aspect-square shrink-0 items-center justify-center rounded-full bg-[#f7f6f3] p-[0.5%] text-orbit-ink"
+              disabled={!canSlideLeft}
+              className="inline-flex h-full aspect-square shrink-0 items-center justify-center rounded-full bg-[#f7f6f3] p-[0.5%] text-orbit-ink disabled:cursor-not-allowed disabled:grayscale disabled:opacity-45"
               title="Slide left"
             >
               <ArrowLeft className="h-5 w-5" aria-hidden="true" />
@@ -390,7 +397,8 @@ function OfferingPhone({ offering }: { offering: Offering }) {
             <span className="text-[18px] font-semibold text-orbit-ink">{isViewAllPage ? "View all listings" : "Slide left and right"}</span>
             <button
               onClick={() => scrollByCard("right")}
-              className="inline-flex h-full aspect-square shrink-0 items-center justify-center rounded-full bg-black p-[0.5%] text-white"
+              disabled={!canSlideRight}
+              className="inline-flex h-full aspect-square shrink-0 items-center justify-center rounded-full bg-black p-[0.5%] text-white disabled:cursor-not-allowed disabled:grayscale disabled:opacity-45"
               title="Slide right"
             >
               <ArrowRight className="h-5 w-5" aria-hidden="true" />
@@ -432,14 +440,22 @@ function ViewAllStack({ offering }: { offering: Offering }) {
   return (
     <Link
       href={`/marketplace?offering=${offering.key}`}
-      className="absolute inset-x-0 top-0 z-30 flex h-[78%] flex-col items-center justify-center overflow-hidden rounded-[30px] bg-white/95 p-6 text-center shadow-[0_18px_45px_rgba(0,0,0,0.2)] backdrop-blur"
+      className="absolute inset-x-0 top-0 z-30 h-[78%] overflow-hidden rounded-[30px] bg-white text-left shadow-[0_18px_45px_rgba(0,0,0,0.2)] transition duration-300"
     >
-      <span className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full bg-orbit-green text-white">{offering.icon}</span>
-      <span className="text-3xl font-black text-orbit-ink">View all</span>
-      <span className="mt-2 text-base font-semibold text-neutral-600">{offering.title} listings across Kenya</span>
-      <span className="mt-6 inline-flex items-center gap-2 rounded-full bg-black px-5 py-3 text-sm font-black text-white">
-        Open marketplace
-        <ArrowRight className="h-4 w-4" aria-hidden="true" />
+      <span className="relative block h-[62%] w-full overflow-hidden">
+        <img src={offering.image} alt={`${offering.title} listings`} className="h-full w-full object-cover" />
+        <span className="absolute inset-0 bg-black/30" />
+        <span className="absolute left-4 top-4 inline-flex h-12 w-12 items-center justify-center rounded-full bg-white/90 text-orbit-green">
+          {offering.icon}
+        </span>
+      </span>
+      <span className="grid gap-2 p-4 text-center">
+        <span className="text-2xl font-black text-orbit-ink">View all</span>
+        <span className="text-base font-semibold text-neutral-600">{offering.title} listings across Kenya</span>
+        <span className="mx-auto mt-2 inline-flex h-[60px] w-fit items-center justify-center gap-2 rounded-full bg-black px-6 text-sm font-black text-white">
+          Open marketplace
+          <ArrowRight className="h-4 w-4" aria-hidden="true" />
+        </span>
       </span>
     </Link>
   );
