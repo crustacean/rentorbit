@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import Link from "next/link";
-import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
+import { useEffect, useMemo, useState, type CSSProperties, type Dispatch, type SetStateAction } from "react";
 
 export type AccountDashboardProps = {
   email: string;
@@ -34,6 +34,7 @@ type ListingKind = "good" | "service" | "personnel";
 type MessageAuthor = "me" | "them" | "system";
 type ActivityKey = "activeRentals" | "ownerListings" | "savedItems" | "pendingSignatures";
 type ActivityTone = "yellow" | "green" | "blue" | "red";
+type AccountMobilePanel = "create" | "activity" | "details";
 
 type ListingPhoto = {
   id: string;
@@ -268,7 +269,7 @@ const selectClass =
 const labelClass = "mb-1 block text-xs font-semibold uppercase text-orbit-ink/55";
 const defaultChatWindowSize: ChatWindowSize = { width: 420, height: 520 };
 const minimizedChatWindowSize: ChatWindowSize = { width: 400, height: 56 };
-const minChatWindowSize = 200;
+const compactChatWindowBreakpoint = 1024;
 
 export function AccountDashboard({ email, onSignOut }: AccountDashboardProps) {
   const [title, setTitle] = useState("");
@@ -286,12 +287,35 @@ export function AccountDashboard({ email, onSignOut }: AccountDashboardProps) {
   const [chatWindowSize, setChatWindowSize] = useState<ChatWindowSize>(defaultChatWindowSize);
   const [chatMinimized, setChatMinimized] = useState(false);
   const [chatDraft, setChatDraft] = useState("");
+  const [mobilePanel, setMobilePanel] = useState<AccountMobilePanel | null>(null);
 
   const activeThread = useMemo(
     () => threads.find((thread) => thread.id === activeThreadId) ?? null,
     [activeThreadId, threads]
   );
   const canCreate = title.trim().length > 2 && description.trim().length > 12;
+
+  useEffect(() => {
+    if (!mobilePanel) {
+      return;
+    }
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setMobilePanel(null);
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [mobilePanel]);
 
   function resetCreateForm() {
     setTitle("");
@@ -353,6 +377,10 @@ export function AccountDashboard({ email, onSignOut }: AccountDashboardProps) {
     setEditingListingId(listing.id);
     setActiveActivity("ownerListings");
     setSelectedActivityItemId(listing.id);
+
+    if (typeof window !== "undefined" && window.innerWidth < 1280) {
+      setMobilePanel("create");
+    }
   }
 
   function deletePhoto(photoId: string) {
@@ -387,6 +415,39 @@ export function AccountDashboard({ email, onSignOut }: AccountDashboardProps) {
     setChatDraft("");
   }
 
+  const createListingPanel = (
+    <CreateListingPanel
+      title={title}
+      kind={kind}
+      county={county}
+      price={price}
+      description={description}
+      photos={photos}
+      canCreate={canCreate}
+      editingListingId={editingListingId}
+      setTitle={setTitle}
+      setKind={setKind}
+      setCounty={setCounty}
+      setPrice={setPrice}
+      setDescription={setDescription}
+      setPhotos={setPhotos}
+      deletePhoto={deletePhoto}
+      saveListing={saveListing}
+    />
+  );
+
+  const mobileMetricsPanel = (
+    <AccountMetricsPanel
+      activeActivity={activeActivity}
+      setActiveActivity={(activity) => {
+        selectActivity(activity);
+        setMobilePanel(null);
+      }}
+    />
+  );
+
+  const sidePanel = <AccountSidePanel email={email} threads={threads} openThread={openThread} />;
+
   return (
     <main className="min-h-screen bg-orbit-field text-orbit-ink">
       <header className="theme-body-border border-b border-white/70 bg-orbit-panel/90">
@@ -417,30 +478,23 @@ export function AccountDashboard({ email, onSignOut }: AccountDashboardProps) {
         </div>
       </header>
 
+      <AccountMobilePanelBar onOpen={setMobilePanel} />
+
+      {mobilePanel ? (
+        <AccountMobilePanelOverlay title={accountPanelTitle(mobilePanel)} onClose={() => setMobilePanel(null)}>
+          {mobilePanel === "create" ? createListingPanel : null}
+          {mobilePanel === "activity" ? mobileMetricsPanel : null}
+          {mobilePanel === "details" ? sidePanel : null}
+        </AccountMobilePanelOverlay>
+      ) : null}
+
       <div className="grid min-h-[calc(100svh-81px)] w-full gap-3 px-3 py-3 xl:h-[calc(100svh-81px)] xl:grid-cols-[300px_minmax(0,1fr)_390px] xl:overflow-hidden 2xl:grid-cols-[320px_minmax(0,1fr)_400px]">
-        <aside className="h-fit self-start xl:sticky xl:top-0 xl:max-h-full xl:overflow-visible">
-          <CreateListingPanel
-            title={title}
-            kind={kind}
-            county={county}
-            price={price}
-            description={description}
-            photos={photos}
-            canCreate={canCreate}
-            editingListingId={editingListingId}
-            setTitle={setTitle}
-            setKind={setKind}
-            setCounty={setCounty}
-            setPrice={setPrice}
-            setDescription={setDescription}
-            setPhotos={setPhotos}
-            deletePhoto={deletePhoto}
-            saveListing={saveListing}
-          />
+        <aside className="hidden h-fit self-start xl:sticky xl:top-0 xl:block xl:max-h-full xl:overflow-visible">
+          {createListingPanel}
         </aside>
 
         <section className="grid min-w-0 content-start gap-3 xl:h-full xl:overflow-y-auto xl:pr-1">
-          <AccountMetricsPanel activeActivity={activeActivity} setActiveActivity={selectActivity} />
+          <AccountMetricsPanel activeActivity={activeActivity} setActiveActivity={selectActivity} className="hidden xl:grid" />
           <ActivityEntriesPanel
             activeActivity={activeActivity}
             ownerListings={ownerListings}
@@ -450,8 +504,8 @@ export function AccountDashboard({ email, onSignOut }: AccountDashboardProps) {
           />
         </section>
 
-        <aside className="h-fit self-start xl:sticky xl:top-0 xl:max-h-full xl:overflow-visible">
-          <AccountSidePanel email={email} threads={threads} openThread={openThread} />
+        <aside className="hidden h-fit self-start xl:sticky xl:top-0 xl:block xl:max-h-full xl:overflow-visible">
+          {sidePanel}
         </aside>
       </div>
 
@@ -477,15 +531,81 @@ export function AccountDashboard({ email, onSignOut }: AccountDashboardProps) {
   );
 }
 
+function accountPanelTitle(panel: AccountMobilePanel): string {
+  if (panel === "create") return "Create Listing";
+  if (panel === "activity") return "Marketplace Activity";
+  return "Account Details";
+}
+
+function AccountMobilePanelBar({ onOpen }: { onOpen: (panel: AccountMobilePanel) => void }) {
+  return (
+    <div className="theme-body-border sticky top-0 z-40 grid grid-cols-3 gap-2 border-b border-white/70 bg-orbit-field/95 px-3 py-2 backdrop-blur xl:hidden">
+      <button
+        type="button"
+        onClick={() => onOpen("create")}
+        className="theme-body-border inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-orbit-panel/92 px-3 text-xs font-black text-orbit-ink ring-1 ring-white/70"
+      >
+        <Plus className="h-4 w-4 text-orbit-green" aria-hidden="true" />
+        Create
+      </button>
+      <button
+        type="button"
+        onClick={() => onOpen("activity")}
+        className="theme-body-border inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-orbit-panel/92 px-3 text-xs font-black text-orbit-ink ring-1 ring-white/70"
+      >
+        <PackageCheck className="h-4 w-4 text-orbit-green" aria-hidden="true" />
+        Activity
+      </button>
+      <button
+        type="button"
+        onClick={() => onOpen("details")}
+        className="theme-body-border inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-orbit-panel/92 px-3 text-xs font-black text-orbit-ink ring-1 ring-white/70"
+      >
+        <CircleUserRound className="h-4 w-4 text-orbit-green" aria-hidden="true" />
+        Details
+      </button>
+    </div>
+  );
+}
+
+function AccountMobilePanelOverlay({
+  title,
+  onClose,
+  children
+}: {
+  title: string;
+  onClose: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col bg-orbit-field" role="dialog" aria-modal="true" aria-label={title}>
+      <div className="theme-body-border flex min-h-16 items-center justify-between border-b border-white/70 bg-orbit-panel/90 px-4">
+        <h2 className="text-lg font-black text-orbit-ink">{title}</h2>
+        <button
+          type="button"
+          onClick={onClose}
+          className="flex h-11 w-11 items-center justify-center rounded-full bg-orbit-soft/85 text-orbit-ink focus-visible:outline-none"
+          aria-label="Close panel"
+        >
+          <X className="h-5 w-5" aria-hidden="true" />
+        </button>
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto p-3">{children}</div>
+    </div>
+  );
+}
+
 function AccountMetricsPanel({
   activeActivity,
-  setActiveActivity
+  setActiveActivity,
+  className = "grid"
 }: {
   activeActivity: ActivityKey;
   setActiveActivity: (activity: ActivityKey) => void;
+  className?: string;
 }) {
   return (
-    <div className={`${panelClass} m-[2px] grid gap-3 p-5 2xl:grid-cols-[1fr_520px]`}>
+    <div className={`${panelClass} ${className} m-[2px] gap-3 p-5 2xl:grid-cols-[1fr_520px]`}>
       <div>
         <div className="flex items-center gap-2 text-sm font-bold text-orbit-green">
           <ShieldCheck className="h-4 w-4" aria-hidden="true" />
@@ -962,6 +1082,10 @@ function FloatingChatWindow({
 }) {
   const [resizeState, setResizeState] = useState<ChatResizeState | null>(null);
   const visibleSize = minimized ? minimizedChatWindowSize : size;
+  const chatWindowStyle = {
+    "--chat-window-width": `${visibleSize.width}px`,
+    height: visibleSize.height
+  } as CSSProperties;
 
   useEffect(() => {
     if (!resizeState || minimized) {
@@ -971,12 +1095,15 @@ function FloatingChatWindow({
     const currentResize = resizeState;
 
     function handlePointerMove(event: PointerEvent) {
-      const maxWidth = Math.max(minChatWindowSize, window.innerWidth - 24);
-      const maxHeight = Math.max(minChatWindowSize, window.innerHeight - 24);
+      const smallWindow = window.innerWidth < compactChatWindowBreakpoint;
+      const maxWidth = Math.max(defaultChatWindowSize.width, window.innerWidth - 24);
+      const maxHeight = Math.max(defaultChatWindowSize.height, window.innerHeight - (smallWindow ? 0 : 24));
 
       setSize({
-        width: Math.min(maxWidth, Math.max(minChatWindowSize, currentResize.startWidth + currentResize.startX - event.clientX)),
-        height: Math.min(maxHeight, Math.max(minChatWindowSize, currentResize.startHeight + currentResize.startY - event.clientY))
+        width: smallWindow
+          ? currentResize.startWidth
+          : Math.min(maxWidth, Math.max(defaultChatWindowSize.width, currentResize.startWidth + currentResize.startX - event.clientX)),
+        height: Math.min(maxHeight, Math.max(defaultChatWindowSize.height, currentResize.startHeight + currentResize.startY - event.clientY))
       });
     }
 
@@ -994,8 +1121,8 @@ function FloatingChatWindow({
 
   return (
     <section
-      className={`${panelClass} fixed bottom-0 right-3 z-50 flex flex-col overflow-hidden rounded-b-none`}
-      style={{ width: visibleSize.width, height: visibleSize.height }}
+      className={`${panelClass} floating-chat-window fixed bottom-0 right-3 z-50 flex flex-col overflow-hidden rounded-b-none`}
+      style={chatWindowStyle}
       aria-label={`Chat with ${thread.participant}`}
     >
       <div className="theme-body-border flex min-h-14 items-center justify-between gap-3 border-b border-white/70 bg-orbit-panel/95 px-4">
@@ -1084,7 +1211,7 @@ function FloatingChatWindow({
             </div>
           </div>
 
-          <div className="theme-body-border border-t border-white/70 p-4">
+          <div className="theme-body-border border-t border-white/70 bg-orbit-panel p-4">
             <div className="flex items-center gap-2 rounded-full border border-orbit-line bg-orbit-field p-[3px] focus-within:border-orbit-line focus-within:outline-none focus-within:ring-0">
               <label className="flex h-12 w-12 shrink-0 cursor-pointer items-center justify-center rounded-full bg-orbit-panel text-orbit-ink" title="Add image">
                 <Plus className="h-5 w-5" aria-hidden="true" />
@@ -1095,7 +1222,7 @@ function FloatingChatWindow({
                 value={draft}
                 onChange={(event) => setDraft(event.target.value)}
                 rows={1}
-                className="max-h-24 min-h-12 min-w-0 flex-1 resize-none bg-transparent px-4 py-3 text-sm font-bold text-orbit-ink outline-none focus:outline-none focus:ring-0 focus-visible:outline-none"
+                className="chat-composer-field max-h-24 min-h-12 min-w-0 flex-1 resize-none rounded-[22px] px-4 py-3 text-sm font-bold text-orbit-ink outline-none focus:outline-none focus:ring-0 focus-visible:outline-none"
               />
               <button
                 type="button"

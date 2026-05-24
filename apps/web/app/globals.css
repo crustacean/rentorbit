@@ -112,3 +112,25 @@ textarea:focus-visible {
 :root[data-theme="dark"] .chat-thread-body {
   background-color: #000000;
 }
+
+.chat-composer-field {
+  background-color: rgb(var(--color-orbit-panel));
+}
+
+.floating-chat-window {
+  width: var(--chat-window-width);
+  max-width: calc(100vw - 24px);
+  max-height: calc(100svh - 24px);
+}
+
+@media (max-width: 1023px) {
+  .floating-chat-window {
+    left: 0 !important;
+    right: 0 !important;
+    width: 100vw;
+    width: 100dvw;
+    max-width: 100vw;
+    max-width: 100dvw;
+    max-height: 100svh;
+  }
+}
