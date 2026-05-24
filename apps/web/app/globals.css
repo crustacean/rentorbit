@@ -108,3 +108,7 @@ textarea:focus-visible {
 :root[data-theme="dark"] .image-overlay-strong svg {
   color: #1a1a1a;
 }
+
+:root[data-theme="dark"] .chat-thread-body {
+  background-color: #000000;
+}

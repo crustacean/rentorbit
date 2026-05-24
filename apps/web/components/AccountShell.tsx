@@ -57,12 +57,12 @@ const accountsKey = "rentorbit:accounts";
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 const idTypes: IdType[] = ["National ID", "Passport number", "Alien ID"];
 const formRailClass =
-  "flex h-[75px] items-center gap-3 rounded-full bg-orbit-soft/85 p-[3px] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.42)] backdrop-blur-md transition focus-within:shadow-[inset_0_0_0_2px_rgba(15,118,110,0.8)]";
-const formIconClass = "flex h-full aspect-square shrink-0 items-center justify-center rounded-full bg-orbit-panel text-neutral-600";
+  "flex h-[75px] items-center gap-3 rounded-full border border-orbit-line bg-orbit-soft/85 p-[3px] shadow-[inset_0_0_0_1px_rgb(255_255_255_/_0.35)] backdrop-blur-md transition focus-within:border-orbit-green focus-within:ring-2 focus-within:ring-orbit-green/35";
+const formIconClass = "flex h-full aspect-square shrink-0 items-center justify-center rounded-full bg-orbit-panel text-orbit-green";
 const formInputClass =
-  "min-w-0 flex-1 bg-transparent px-1 text-base font-semibold text-orbit-ink outline-none placeholder:text-neutral-500 focus-visible:outline-none";
+  "min-w-0 flex-1 bg-transparent px-1 text-base font-semibold text-orbit-ink outline-none placeholder:text-orbit-ink/45 focus-visible:outline-none";
 const formActionClass =
-  "flex h-[75px] w-full items-center justify-center rounded-full bg-black px-6 text-sm font-black text-white transition disabled:cursor-not-allowed disabled:grayscale disabled:opacity-45";
+  "flex h-[75px] w-full items-center justify-center rounded-full border border-orbit-line bg-orbit-panel px-6 text-sm font-black text-orbit-ink shadow-[inset_0_0_0_1px_rgb(255_255_255_/_0.3)] transition hover:bg-orbit-soft disabled:cursor-not-allowed disabled:grayscale disabled:opacity-45";
 const formSuccessActionClass =
   "flex h-[75px] w-full items-center justify-center rounded-full bg-orbit-green px-6 text-sm font-black text-orbit-field transition disabled:cursor-not-allowed disabled:grayscale disabled:opacity-45";
 
@@ -160,7 +160,7 @@ async function postApi<T>(path: string, body: unknown): Promise<ApiResult<T>> {
 function AccountLoading() {
   return (
     <main className="grid min-h-screen place-items-center bg-orbit-field px-4">
-      <div className="w-full max-w-md rounded-md border border-orbit-line bg-orbit-panel p-6 text-center shadow-panel">
+      <div className="theme-body-border w-full max-w-md rounded-[36px] bg-orbit-panel/92 p-6 text-center shadow-[0_14px_36px_rgba(25,32,29,0.08)] ring-1 ring-white/70">
         <Loader2 className="mx-auto mb-4 h-8 w-8 animate-spin text-orbit-green" aria-hidden="true" />
         <p className="text-lg font-black">Loading account</p>
       </div>
@@ -371,35 +371,66 @@ export function AccountShell({ initialMode }: { initialMode: AccountMode }) {
   }
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-orbit-field text-orbit-ink">
-      <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1556745757-8d76bdb6984b?auto=format&fit=crop&w=2200&q=85')] bg-cover bg-center" />
-      <div className="absolute inset-0 bg-black/55" />
-
-      <header className="absolute left-4 right-4 top-4 z-20 flex items-center justify-between gap-3 sm:left-8 sm:right-8 sm:top-8">
-        <Link href="/" className="flex min-w-0 items-center gap-3 rounded-md bg-orbit-panel/90 px-3 py-2 shadow-panel backdrop-blur" aria-label="RentOrbit home">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-orbit-green text-orbit-field">
-            <span className="text-lg font-black">RO</span>
-          </div>
-          <div className="hidden min-w-0 sm:block">
-            <p className="truncate text-lg font-black leading-none">RentOrbit</p>
-            <p className="mt-1 truncate text-xs font-semibold text-neutral-600">Account</p>
-          </div>
-        </Link>
-        <div className="flex shrink-0 items-center gap-2">
-          <ThemeSwitcher compact />
-          <Link
-            href="/account"
-            className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-orbit-panel/90 text-orbit-ink shadow-panel backdrop-blur transition-colors hover:bg-orbit-panel focus-visible:outline-none"
-            title="Account"
-          >
-            <CircleUserRound className="h-7 w-7" aria-hidden="true" />
-            <span className="sr-only">Account</span>
+    <main className="min-h-screen bg-orbit-field text-orbit-ink">
+      <header className="theme-body-border border-b border-white/70 bg-orbit-panel/90">
+        <div className="flex w-full items-center justify-between gap-3 px-4 py-4">
+          <Link href="/" className="flex min-w-0 items-center gap-3" aria-label="RentOrbit home">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-orbit-green text-orbit-field">
+              <span className="text-lg font-black">RO</span>
+            </div>
+            <div className="min-w-0">
+              <p className="truncate text-xl font-black leading-none text-orbit-ink sm:text-2xl">RentOrbit</p>
+              <p className="mt-1 truncate text-sm font-semibold text-orbit-ink/65">Account</p>
+            </div>
           </Link>
+          <div className="flex shrink-0 items-center gap-2">
+            <ThemeSwitcher compact />
+            <Link
+              href="/account"
+              className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-orbit-panel/90 text-orbit-ink shadow-panel backdrop-blur transition-colors hover:bg-orbit-panel focus-visible:outline-none"
+              title="Account"
+            >
+              <CircleUserRound className="h-7 w-7" aria-hidden="true" />
+              <span className="sr-only">Account</span>
+            </Link>
+          </div>
         </div>
       </header>
 
-      <section className="relative z-10 grid min-h-screen place-items-center px-4 pb-8 pt-28 sm:pt-32">
-        <div className="w-full max-w-lg rounded-[34px] border border-white/30 bg-orbit-panel/94 p-5 shadow-panel backdrop-blur">
+      <section className="mx-auto grid min-h-[calc(100svh-81px)] w-full max-w-[1400px] items-center gap-3 px-3 py-6 sm:px-4 lg:grid-cols-[minmax(0,0.92fr)_minmax(380px,520px)]">
+        <aside className="theme-body-border hidden min-h-[620px] overflow-hidden rounded-[36px] bg-orbit-panel/92 p-6 shadow-[0_14px_36px_rgba(25,32,29,0.08)] ring-1 ring-white/70 lg:flex lg:flex-col lg:justify-between">
+          <div>
+            <span className="orbit-tag inline-flex rounded-full bg-orbit-soft px-4 py-3 text-xs font-black uppercase text-orbit-green">
+              RentOrbit account
+            </span>
+            <h1 className="mt-6 max-w-xl text-5xl font-black leading-[0.98] text-orbit-ink">
+              Verified renting starts here.
+            </h1>
+            <p className="mt-5 max-w-2xl text-lg font-semibold leading-8 text-orbit-ink/65">
+              One workspace for KYC, messages, booking proposals, signed contracts, deposits, payouts, and saved listings.
+            </p>
+          </div>
+
+          <div className="grid gap-3">
+            {[
+              { title: "Identity first", text: "IPRS validation unlocks listing, signing, payment, and payout actions.", icon: <ShieldCheck className="h-5 w-5" aria-hidden="true" /> },
+              { title: "Private by design", text: "Exact coordinates and sensitive ID details stay protected.", icon: <LockKeyhole className="h-5 w-5" aria-hidden="true" /> },
+              { title: "Countrywide access", text: "Owners and renters share the same account across all categories.", icon: <CircleUserRound className="h-5 w-5" aria-hidden="true" /> }
+            ].map((item) => (
+              <div key={item.title} className="flex items-center gap-4 rounded-full border border-orbit-line bg-orbit-field/55 p-[3px] pr-5">
+                <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-orbit-panel text-orbit-green">
+                  {item.icon}
+                </span>
+                <div className="min-w-0">
+                  <p className="text-sm font-black text-orbit-ink">{item.title}</p>
+                  <p className="truncate text-xs font-semibold text-orbit-ink/60">{item.text}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </aside>
+
+        <div className="theme-body-border w-full rounded-[36px] bg-orbit-panel/92 p-5 shadow-[0_14px_36px_rgba(25,32,29,0.08)] ring-1 ring-white/70 backdrop-blur">
           <div className="mb-6 px-2">
             <p className="text-sm font-black uppercase text-orbit-green">Account</p>
             <h1 className="mt-1 text-3xl font-black">{mode === "signup" ? "Sign up" : "Sign in"}</h1>
@@ -409,7 +440,7 @@ export function AccountShell({ initialMode }: { initialMode: AccountMode }) {
             <div className="grid gap-4">
               <div className="grid gap-4">
                 <label className="block">
-                  <span className="mb-2 block px-3 text-xs font-black uppercase text-neutral-500">First name</span>
+                  <span className="mb-2 block px-3 text-xs font-black uppercase text-orbit-ink/55">First name</span>
                   <div className={formRailClass}>
                     <span className={formIconClass}>
                       <UserRound className="h-5 w-5" aria-hidden="true" />
@@ -425,7 +456,7 @@ export function AccountShell({ initialMode }: { initialMode: AccountMode }) {
                 </label>
 
                 <label className="block">
-                  <span className="mb-2 block px-3 text-xs font-black uppercase text-neutral-500">Last name</span>
+                  <span className="mb-2 block px-3 text-xs font-black uppercase text-orbit-ink/55">Last name</span>
                   <div className={formRailClass}>
                     <span className={formIconClass}>
                       <UserRound className="h-5 w-5" aria-hidden="true" />
@@ -442,7 +473,7 @@ export function AccountShell({ initialMode }: { initialMode: AccountMode }) {
               </div>
 
               <label className="block">
-                <span className="mb-2 block px-3 text-xs font-black uppercase text-neutral-500">ID type</span>
+                <span className="mb-2 block px-3 text-xs font-black uppercase text-orbit-ink/55">ID type</span>
                 <div className={formRailClass}>
                   <span className={formIconClass}>
                     <IdCard className="h-5 w-5" aria-hidden="true" />
@@ -458,14 +489,14 @@ export function AccountShell({ initialMode }: { initialMode: AccountMode }) {
                       </option>
                     ))}
                   </select>
-                  <span className="mr-3 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/50 text-neutral-600">
+                  <span className="mr-3 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-orbit-panel/75 text-orbit-ink">
                     <ChevronDown className="h-4 w-4" aria-hidden="true" />
                   </span>
                 </div>
               </label>
 
               <label className="block">
-                <span className="mb-2 block px-3 text-xs font-black uppercase text-neutral-500">ID number</span>
+                <span className="mb-2 block px-3 text-xs font-black uppercase text-orbit-ink/55">ID number</span>
                 <div className={formRailClass}>
                   <span className={formIconClass}>
                     <ShieldCheck className="h-5 w-5" aria-hidden="true" />
@@ -478,7 +509,7 @@ export function AccountShell({ initialMode }: { initialMode: AccountMode }) {
                     autoComplete="off"
                   />
                   {identityVerified ? (
-                    <span className="mr-3 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/65 text-orbit-green">
+                    <span className="mr-3 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-orbit-panel/80 text-orbit-green">
                       <CheckCircle2 className="h-5 w-5" aria-hidden="true" />
                     </span>
                   ) : null}
@@ -551,7 +582,7 @@ export function AccountShell({ initialMode }: { initialMode: AccountMode }) {
             </div>
           )}
 
-          <div className="mt-4 min-h-6 text-xs font-bold text-neutral-600">
+          <div className="mt-4 min-h-6 text-xs font-bold text-orbit-ink/65">
             {message ? (
               <span className={iprsStatus === "verified" ? "inline-flex items-center gap-2 text-orbit-green" : "inline-flex items-center gap-2 text-red-700"}>
                 {iprsStatus === "verified" ? <CheckCircle2 className="h-4 w-4" aria-hidden="true" /> : <AlertCircle className="h-4 w-4" aria-hidden="true" />}
@@ -568,7 +599,7 @@ export function AccountShell({ initialMode }: { initialMode: AccountMode }) {
             {mode === "signup" && passwordValid && confirmPassword && !passwordsMatch ? <span>Passwords must match.</span> : null}
           </div>
 
-          <div className="mt-5 border-t border-orbit-line pt-4 text-sm font-bold text-neutral-600">
+          <div className="mt-5 border-t border-orbit-line pt-4 text-sm font-bold text-orbit-ink/65">
             {mode === "signup" ? (
               <p>
                 Already have an account?{" "}
@@ -627,7 +658,7 @@ function CredentialFields({
   return (
     <>
       <label className="block">
-        <span className="mb-2 block px-3 text-xs font-black uppercase text-neutral-500">Email</span>
+        <span className="mb-2 block px-3 text-xs font-black uppercase text-orbit-ink/55">Email</span>
         <div className={formRailClass}>
           <span className={formIconClass}>
             <Mail className="h-5 w-5" aria-hidden="true" />
@@ -640,7 +671,7 @@ function CredentialFields({
             autoComplete="email"
           />
           {emailValid ? (
-            <span className="mr-3 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/65 text-orbit-green">
+            <span className="mr-3 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-orbit-panel/80 text-orbit-green">
               <CheckCircle2 className="h-5 w-5" aria-hidden="true" />
             </span>
           ) : null}
@@ -648,7 +679,7 @@ function CredentialFields({
       </label>
 
       <label className="block">
-        <span className="mb-2 block px-3 text-xs font-black uppercase text-neutral-500">Password</span>
+        <span className="mb-2 block px-3 text-xs font-black uppercase text-orbit-ink/55">Password</span>
         <div className={formRailClass}>
           <span className={formIconClass}>
             <LockKeyhole className="h-5 w-5" aria-hidden="true" />
@@ -661,14 +692,14 @@ function CredentialFields({
             autoComplete={mode === "signup" ? "new-password" : "current-password"}
           />
           {passwordValid ? (
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/65 text-orbit-green">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-orbit-panel/80 text-orbit-green">
               <CheckCircle2 className="h-5 w-5" aria-hidden="true" />
             </span>
           ) : null}
           <button
             type="button"
             onClick={() => setShowPassword((current) => !current)}
-            className="mr-1 flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white/65 text-neutral-600 focus-visible:outline-none"
+            className="mr-1 flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-orbit-panel/80 text-orbit-ink focus-visible:outline-none"
             title={showPassword ? "Hide password" : "Show password"}
           >
             {showPassword ? <EyeOff className="h-5 w-5" aria-hidden="true" /> : <Eye className="h-5 w-5" aria-hidden="true" />}
@@ -678,7 +709,7 @@ function CredentialFields({
 
       {mode === "signup" ? (
         <label className="block">
-          <span className="mb-2 block px-3 text-xs font-black uppercase text-neutral-500">Confirm password</span>
+          <span className="mb-2 block px-3 text-xs font-black uppercase text-orbit-ink/55">Confirm password</span>
           <div className={formRailClass}>
             <span className={formIconClass}>
               <LockKeyhole className="h-5 w-5" aria-hidden="true" />
@@ -691,14 +722,14 @@ function CredentialFields({
               autoComplete="new-password"
             />
             {confirmPassword && passwordsMatch ? (
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/65 text-orbit-green">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-orbit-panel/80 text-orbit-green">
                 <CheckCircle2 className="h-5 w-5" aria-hidden="true" />
               </span>
             ) : null}
             <button
               type="button"
               onClick={() => setShowConfirmPassword((current) => !current)}
-              className="mr-1 flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white/65 text-neutral-600 focus-visible:outline-none"
+              className="mr-1 flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-orbit-panel/80 text-orbit-ink focus-visible:outline-none"
               title={showConfirmPassword ? "Hide password" : "Show password"}
             >
               {showConfirmPassword ? <EyeOff className="h-5 w-5" aria-hidden="true" /> : <Eye className="h-5 w-5" aria-hidden="true" />}
