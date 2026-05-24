@@ -4,8 +4,34 @@
 
 :root {
   color-scheme: light;
-  background: #f7f7f2;
-  color: #19201d;
+  --color-orbit-ink: 25 32 29;
+  --color-orbit-field: 243 246 251;
+  --color-orbit-line: 215 222 232;
+  --color-orbit-panel: 255 255 255;
+  --color-orbit-soft: 232 230 227;
+  --color-orbit-primary: 41 84 133;
+  --color-orbit-leaf: 47 125 50;
+  --color-orbit-amber: 183 121 31;
+  --color-orbit-clay: 173 75 61;
+  --color-orbit-accent: 67 145 245;
+  --color-orbit-shadow: 25 32 29;
+  background: rgb(var(--color-orbit-field));
+  color: rgb(var(--color-orbit-ink));
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --color-orbit-ink: 224 224 224;
+  --color-orbit-field: 26 26 26;
+  --color-orbit-line: 191 191 191;
+  --color-orbit-panel: 34 37 38;
+  --color-orbit-soft: 53 58 62;
+  --color-orbit-primary: 224 224 224;
+  --color-orbit-leaf: 191 191 191;
+  --color-orbit-amber: 224 224 224;
+  --color-orbit-clay: 191 191 191;
+  --color-orbit-accent: 224 224 224;
+  --color-orbit-shadow: 0 0 0;
 }
 
 * {
@@ -20,9 +46,9 @@ body {
   margin: 0;
   min-height: 100vh;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(247, 247, 242, 0.98)),
-    #f7f7f2;
-  color: #19201d;
+    linear-gradient(180deg, rgb(var(--color-orbit-panel) / 0.92), rgb(var(--color-orbit-field) / 0.98)),
+    rgb(var(--color-orbit-field));
+  color: rgb(var(--color-orbit-ink));
   font-family:
     Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   letter-spacing: 0;
@@ -45,4 +71,40 @@ textarea:focus-visible {
 
 .scrollbar-thin {
   scrollbar-width: thin;
+}
+
+:root[data-theme="dark"] .theme-body-border {
+  border-color: rgb(var(--color-orbit-field));
+  --tw-ring-color: rgb(var(--color-orbit-field));
+}
+
+:root[data-theme="dark"] .orbit-tag {
+  background-color: #353a3e;
+  border-color: rgb(191 191 191 / 0.28);
+  color: #e0e0e0;
+}
+
+:root[data-theme="dark"] .orbit-tag svg {
+  color: #e0e0e0;
+}
+
+:root[data-theme="dark"] .image-overlay-element,
+:root[data-theme="dark"] .image-overlay-element *,
+:root[data-theme="dark"] .image-overlay-element svg {
+  color: #e0e0e0;
+}
+
+:root[data-theme="dark"] .image-overlay-surface {
+  background-color: rgb(34 37 38 / 0.82);
+  border-color: rgb(191 191 191 / 0.32);
+}
+
+:root[data-theme="dark"] .image-overlay-strong {
+  background-color: #e0e0e0;
+  color: #1a1a1a;
+}
+
+:root[data-theme="dark"] .image-overlay-strong *,
+:root[data-theme="dark"] .image-overlay-strong svg {
+  color: #1a1a1a;
 }

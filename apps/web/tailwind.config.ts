@@ -6,18 +6,20 @@ const config: Config = {
     extend: {
       colors: {
         orbit: {
-          ink: "#19201d",
-          field: "#f7f7f2",
-          line: "#d9ded3",
-          green: "#0f766e",
-          leaf: "#2f7d32",
-          amber: "#b7791f",
-          clay: "#ad4b3d",
-          sky: "#2563eb"
+          ink: "rgb(var(--color-orbit-ink) / <alpha-value>)",
+          field: "rgb(var(--color-orbit-field) / <alpha-value>)",
+          line: "rgb(var(--color-orbit-line) / <alpha-value>)",
+          panel: "rgb(var(--color-orbit-panel) / <alpha-value>)",
+          soft: "rgb(var(--color-orbit-soft) / <alpha-value>)",
+          green: "rgb(var(--color-orbit-primary) / <alpha-value>)",
+          leaf: "rgb(var(--color-orbit-leaf) / <alpha-value>)",
+          amber: "rgb(var(--color-orbit-amber) / <alpha-value>)",
+          clay: "rgb(var(--color-orbit-clay) / <alpha-value>)",
+          sky: "rgb(var(--color-orbit-accent) / <alpha-value>)"
         }
       },
       boxShadow: {
-        panel: "0 10px 30px rgba(25, 32, 29, 0.08)"
+        panel: "0 10px 30px rgb(var(--color-orbit-shadow) / 0.08)"
       }
     }
   },

@@ -1,10 +1,12 @@
 "use client";
 
 import type { AccountDashboardProps } from "@/components/AccountDashboard";
+import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import {
   AlertCircle,
   CheckCircle2,
   ChevronDown,
+  CircleUserRound,
   Eye,
   EyeOff,
   IdCard,
@@ -14,6 +16,7 @@ import {
   ShieldCheck,
   UserRound
 } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, type ComponentType } from "react";
 
@@ -54,14 +57,14 @@ const accountsKey = "rentorbit:accounts";
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 const idTypes: IdType[] = ["National ID", "Passport number", "Alien ID"];
 const formRailClass =
-  "flex h-[75px] items-center gap-3 rounded-full bg-[#e8e6e3]/85 p-[3px] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.42)] backdrop-blur-md transition focus-within:shadow-[inset_0_0_0_2px_rgba(15,118,110,0.8)]";
-const formIconClass = "flex h-full aspect-square shrink-0 items-center justify-center rounded-full bg-[#f7f6f3] text-neutral-600";
+  "flex h-[75px] items-center gap-3 rounded-full bg-orbit-soft/85 p-[3px] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.42)] backdrop-blur-md transition focus-within:shadow-[inset_0_0_0_2px_rgba(15,118,110,0.8)]";
+const formIconClass = "flex h-full aspect-square shrink-0 items-center justify-center rounded-full bg-orbit-panel text-neutral-600";
 const formInputClass =
   "min-w-0 flex-1 bg-transparent px-1 text-base font-semibold text-orbit-ink outline-none placeholder:text-neutral-500 focus-visible:outline-none";
 const formActionClass =
   "flex h-[75px] w-full items-center justify-center rounded-full bg-black px-6 text-sm font-black text-white transition disabled:cursor-not-allowed disabled:grayscale disabled:opacity-45";
 const formSuccessActionClass =
-  "flex h-[75px] w-full items-center justify-center rounded-full bg-orbit-green px-6 text-sm font-black text-white transition disabled:cursor-not-allowed disabled:grayscale disabled:opacity-45";
+  "flex h-[75px] w-full items-center justify-center rounded-full bg-orbit-green px-6 text-sm font-black text-orbit-field transition disabled:cursor-not-allowed disabled:grayscale disabled:opacity-45";
 
 let dashboardImport: Promise<{ AccountDashboard: DashboardComponent }> | null = null;
 
@@ -157,7 +160,7 @@ async function postApi<T>(path: string, body: unknown): Promise<ApiResult<T>> {
 function AccountLoading() {
   return (
     <main className="grid min-h-screen place-items-center bg-orbit-field px-4">
-      <div className="w-full max-w-md rounded-md border border-orbit-line bg-white p-6 text-center shadow-panel">
+      <div className="w-full max-w-md rounded-md border border-orbit-line bg-orbit-panel p-6 text-center shadow-panel">
         <Loader2 className="mx-auto mb-4 h-8 w-8 animate-spin text-orbit-green" aria-hidden="true" />
         <p className="text-lg font-black">Loading account</p>
       </div>
@@ -372,8 +375,31 @@ export function AccountShell({ initialMode }: { initialMode: AccountMode }) {
       <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1556745757-8d76bdb6984b?auto=format&fit=crop&w=2200&q=85')] bg-cover bg-center" />
       <div className="absolute inset-0 bg-black/55" />
 
-      <section className="relative z-10 grid min-h-screen place-items-center px-4 py-8">
-        <div className="w-full max-w-lg rounded-[34px] border border-white/30 bg-white/94 p-5 shadow-panel backdrop-blur">
+      <header className="absolute left-4 right-4 top-4 z-20 flex items-center justify-between gap-3 sm:left-8 sm:right-8 sm:top-8">
+        <Link href="/" className="flex min-w-0 items-center gap-3 rounded-md bg-orbit-panel/90 px-3 py-2 shadow-panel backdrop-blur" aria-label="RentOrbit home">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-orbit-green text-orbit-field">
+            <span className="text-lg font-black">RO</span>
+          </div>
+          <div className="hidden min-w-0 sm:block">
+            <p className="truncate text-lg font-black leading-none">RentOrbit</p>
+            <p className="mt-1 truncate text-xs font-semibold text-neutral-600">Account</p>
+          </div>
+        </Link>
+        <div className="flex shrink-0 items-center gap-2">
+          <ThemeSwitcher compact />
+          <Link
+            href="/account"
+            className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-orbit-panel/90 text-orbit-ink shadow-panel backdrop-blur transition-colors hover:bg-orbit-panel focus-visible:outline-none"
+            title="Account"
+          >
+            <CircleUserRound className="h-7 w-7" aria-hidden="true" />
+            <span className="sr-only">Account</span>
+          </Link>
+        </div>
+      </header>
+
+      <section className="relative z-10 grid min-h-screen place-items-center px-4 pb-8 pt-28 sm:pt-32">
+        <div className="w-full max-w-lg rounded-[34px] border border-white/30 bg-orbit-panel/94 p-5 shadow-panel backdrop-blur">
           <div className="mb-6 px-2">
             <p className="text-sm font-black uppercase text-orbit-green">Account</p>
             <h1 className="mt-1 text-3xl font-black">{mode === "signup" ? "Sign up" : "Sign in"}</h1>

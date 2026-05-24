@@ -17,6 +17,7 @@ import {
   UserRoundCheck,
   X
 } from "lucide-react";
+import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import Link from "next/link";
 import {
   calculateBookingQuote,
@@ -224,11 +225,11 @@ export function MarketplaceExperience() {
   }
 
   return (
-    <main className="min-h-screen bg-[#eef0ec]">
-      <header className="border-b border-white/70 bg-white/90">
+    <main className="min-h-screen bg-orbit-field">
+      <header className="theme-body-border border-b border-white/70 bg-orbit-panel/90">
         <div className="flex w-full items-center justify-between gap-3 px-4 py-4">
           <Link href="/" className="flex min-w-0 items-center gap-3" aria-label="RentOrbit home">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-orbit-green text-white">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-orbit-green text-orbit-field">
               <span className="text-lg font-black">RO</span>
             </div>
             <div className="min-w-0">
@@ -236,14 +237,17 @@ export function MarketplaceExperience() {
               <p className="truncate text-sm text-neutral-600">Kenya rentals, services, personnel</p>
             </div>
           </Link>
-          <Link
-            href="/account"
-            className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-white/90 text-orbit-ink shadow-[0_2px_14px_rgba(25,32,29,0.12)] backdrop-blur transition-colors hover:bg-white focus-visible:outline-none"
-            title="Account"
-          >
-            <CircleUserRound className="h-7 w-7" aria-hidden="true" />
-            <span className="sr-only">Account</span>
-          </Link>
+          <div className="flex shrink-0 items-center gap-2">
+            <ThemeSwitcher compact />
+            <Link
+              href="/account"
+              className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-orbit-panel/90 text-orbit-ink shadow-[0_2px_14px_rgba(25,32,29,0.12)] backdrop-blur transition-colors hover:bg-orbit-panel focus-visible:outline-none"
+              title="Account"
+            >
+              <CircleUserRound className="h-7 w-7" aria-hidden="true" />
+              <span className="sr-only">Account</span>
+            </Link>
+          </div>
         </div>
       </header>
 
@@ -278,7 +282,7 @@ export function MarketplaceExperience() {
           <MarketplaceSummaryPanel filters={filters} resultsLength={results.length} className="hidden xl:grid" />
 
           <div className="grid gap-3">
-            <div className="rounded-[30px] bg-white/35 p-3">
+            <div className="rounded-[30px] bg-orbit-panel/35 p-3">
               <div className="grid gap-x-3 gap-y-3 lg:grid-cols-2 2xl:grid-cols-3">
                 {results.map((result) => (
                   <MarketplaceListingCard
@@ -317,11 +321,11 @@ function panelTitle(panel: MobilePanel): string {
 
 function MobilePanelBar({ onOpen }: { onOpen: (panel: MobilePanel) => void }) {
   return (
-    <div className="sticky top-0 z-40 grid grid-cols-3 gap-2 border-b border-white/70 bg-[#eef0ec]/95 px-3 py-2 backdrop-blur xl:hidden">
+    <div className="theme-body-border sticky top-0 z-40 grid grid-cols-3 gap-2 border-b border-white/70 bg-orbit-field/95 px-3 py-2 backdrop-blur xl:hidden">
       <button
         type="button"
         onClick={() => onOpen("discovery")}
-        className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-white/92 px-3 text-xs font-black text-orbit-ink ring-1 ring-white/70"
+        className="theme-body-border inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-orbit-panel/92 px-3 text-xs font-black text-orbit-ink ring-1 ring-white/70"
       >
         <Filter className="h-4 w-4 text-orbit-green" aria-hidden="true" />
         Discovery
@@ -329,7 +333,7 @@ function MobilePanelBar({ onOpen }: { onOpen: (panel: MobilePanel) => void }) {
       <button
         type="button"
         onClick={() => onOpen("metrics")}
-        className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-white/92 px-3 text-xs font-black text-orbit-ink ring-1 ring-white/70"
+        className="theme-body-border inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-orbit-panel/92 px-3 text-xs font-black text-orbit-ink ring-1 ring-white/70"
       >
         <MapPin className="h-4 w-4 text-orbit-green" aria-hidden="true" />
         Metrics
@@ -337,7 +341,7 @@ function MobilePanelBar({ onOpen }: { onOpen: (panel: MobilePanel) => void }) {
       <button
         type="button"
         onClick={() => onOpen("details")}
-        className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-white/92 px-3 text-xs font-black text-orbit-ink ring-1 ring-white/70"
+        className="theme-body-border inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-orbit-panel/92 px-3 text-xs font-black text-orbit-ink ring-1 ring-white/70"
       >
         <PackageCheck className="h-4 w-4 text-orbit-green" aria-hidden="true" />
         Details
@@ -356,13 +360,13 @@ function MobilePanelOverlay({
   children: React.ReactNode;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-[#eef0ec]" role="dialog" aria-modal="true" aria-label={title}>
-      <div className="flex min-h-16 items-center justify-between border-b border-white/70 bg-white/90 px-4">
+    <div className="fixed inset-0 z-50 flex flex-col bg-orbit-field" role="dialog" aria-modal="true" aria-label={title}>
+      <div className="theme-body-border flex min-h-16 items-center justify-between border-b border-white/70 bg-orbit-panel/90 px-4">
         <h2 className="text-lg font-black text-orbit-ink">{title}</h2>
         <button
           type="button"
           onClick={onClose}
-          className="flex h-11 w-11 items-center justify-center rounded-full bg-[#e8e6e3]/85 text-orbit-ink focus-visible:outline-none"
+          className="flex h-11 w-11 items-center justify-center rounded-full bg-orbit-soft/85 text-orbit-ink focus-visible:outline-none"
           aria-label="Close panel"
         >
           <X className="h-5 w-5" aria-hidden="true" />
@@ -381,7 +385,7 @@ function DiscoveryPanel({
   patchFilters: (next: Partial<FilterState>) => void;
 }) {
   return (
-    <section className="max-h-full overflow-auto rounded-[36px] bg-white/92 p-4 shadow-[0_14px_36px_rgba(25,32,29,0.08)] ring-1 ring-white/70">
+    <section className="theme-body-border max-h-full overflow-auto rounded-[36px] bg-orbit-panel/92 p-4 shadow-[0_14px_36px_rgba(25,32,29,0.08)] ring-1 ring-white/70">
       <div className="mb-4 flex items-center justify-between">
         <h2 className="text-base font-bold">Discovery</h2>
         <button className="rounded-full border border-orbit-line p-2 text-orbit-green" title="Filter listings">
@@ -470,7 +474,7 @@ function MarketplaceSummaryPanel({
   className?: string;
 }) {
   return (
-    <div className={`${className} gap-3 rounded-[36px] bg-white/92 p-5 ring-1 ring-white/70 lg:grid-cols-[1fr_280px]`}>
+    <div className={`theme-body-border ${className} m-[2px] gap-3 rounded-[36px] bg-orbit-panel/92 p-5 ring-1 ring-white/70 lg:grid-cols-[1fr_280px]`}>
       <div>
         <div className="flex items-center gap-2 text-sm font-bold text-orbit-green">
           <MapPin className="h-4 w-4" aria-hidden="true" />
@@ -482,9 +486,9 @@ function MarketplaceSummaryPanel({
         </p>
       </div>
       <div className="grid grid-cols-3 gap-2 text-center text-xs">
-        <Metric label="Searches" value="1.8k" tone="sky" />
+        <Metric label="Searches" value="1.8k" tone="yellow" />
         <Metric label="Signed" value="64%" tone="green" />
-        <Metric label="Disputes" value="2.1%" tone="clay" />
+        <Metric label="Disputes" value="2.1%" tone="red" />
       </div>
     </div>
   );
@@ -508,7 +512,7 @@ function ListingDetailsPanel({
   proposeBooking: () => void;
 }) {
   return (
-    <section className="max-h-full overflow-auto rounded-[36px] bg-white/92 p-4 shadow-[0_14px_36px_rgba(25,32,29,0.08)] ring-1 ring-white/70">
+    <section className="theme-body-border max-h-full overflow-auto rounded-[36px] bg-orbit-panel/92 p-4 shadow-[0_14px_36px_rgba(25,32,29,0.08)] ring-1 ring-white/70">
       <img
         src={selectedListing.media[0]?.url}
         alt={selectedListing.media[0]?.alt ?? selectedListing.title}
@@ -517,15 +521,15 @@ function ListingDetailsPanel({
       <div className="grid gap-4 pt-4">
         <div>
           <div className="flex flex-wrap gap-2 text-xs font-bold">
-            <span className="rounded-full bg-orbit-field px-3 py-1">{selectedListing.location.county}</span>
-            <span className="rounded-full bg-orbit-field px-3 py-1">{selectedListing.category}</span>
-            <span className="rounded-full bg-orbit-field px-3 py-1">{selectedListing.kind}</span>
+            <span className="orbit-tag rounded-full bg-orbit-field px-3 py-1">{selectedListing.location.county}</span>
+            <span className="orbit-tag rounded-full bg-orbit-field px-3 py-1">{selectedListing.category}</span>
+            <span className="orbit-tag rounded-full bg-orbit-field px-3 py-1">{selectedListing.kind}</span>
           </div>
           <h2 className="mt-3 text-xl font-black">{selectedListing.title}</h2>
           <p className="mt-2 text-sm leading-6 text-neutral-600">{selectedListing.description}</p>
         </div>
 
-        <div className="rounded-[28px] bg-[#e8e6e3]/75 p-3">
+        <div className="rounded-[28px] bg-orbit-soft/75 p-3">
           <div className="flex items-center justify-between gap-3">
             <div>
               <h3 className="text-base font-black">Approximate</h3>
@@ -537,11 +541,11 @@ function ListingDetailsPanel({
               <MapPin className="h-5 w-5" aria-hidden="true" />
             </span>
           </div>
-          <div className="relative mt-3 h-36 overflow-hidden rounded-[26px] bg-[#d7d2ca]">
+          <div className="relative mt-3 h-36 overflow-hidden rounded-[26px] bg-orbit-line">
             <div className="absolute inset-0 opacity-60 [background-image:linear-gradient(rgba(255,255,255,0.55)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.55)_1px,transparent_1px)] [background-size:28px_28px]" />
             <div className="absolute left-[18%] top-[24%] h-20 w-20 rounded-full border border-white/70 bg-white/20" />
             <div className="absolute bottom-[12%] right-[14%] h-24 w-24 rounded-full border border-white/60 bg-white/15" />
-            <span className="absolute left-1/2 top-1/2 flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-orbit-green text-white shadow-panel">
+            <span className="absolute left-1/2 top-1/2 flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-orbit-green text-orbit-field shadow-panel">
               <MapPin className="h-6 w-6" aria-hidden="true" />
             </span>
           </div>
@@ -559,8 +563,8 @@ function ListingDetailsPanel({
               onClick={() => setSelectedMode(rule.mode)}
               className={`min-h-14 rounded-[18px] border px-2 py-2 text-xs font-bold ${
                 activeMode === rule.mode
-                  ? "border-orbit-green bg-emerald-50 text-orbit-green"
-                  : "border-orbit-line bg-white text-orbit-ink"
+                  ? "border-orbit-green bg-orbit-soft text-orbit-green"
+                  : "border-orbit-line bg-orbit-panel text-orbit-ink"
               }`}
               title={rule.label}
             >
@@ -600,7 +604,7 @@ function ListingDetailsPanel({
           </button>
           <button
             onClick={proposeBooking}
-            className="inline-flex items-center justify-center gap-2 rounded-full bg-orbit-green px-3 py-3 text-sm font-bold text-white"
+            className="inline-flex items-center justify-center gap-2 rounded-full bg-orbit-green px-3 py-3 text-sm font-bold text-orbit-field"
           >
             <FileSignature className="h-4 w-4" aria-hidden="true" />
             Propose
@@ -629,7 +633,7 @@ function FilterSelect({
         <select
           value={value}
           onChange={(event) => onChange(event.target.value)}
-          className="w-full appearance-none rounded-[18px] border border-orbit-line bg-white py-2 pl-3 pr-11 text-sm outline-none focus:border-orbit-line focus:outline-none focus:ring-0 focus-visible:outline-none"
+          className="w-full appearance-none rounded-[18px] border border-orbit-line bg-orbit-panel py-2 pl-3 pr-11 text-sm outline-none focus:border-orbit-line focus:outline-none focus:ring-0 focus-visible:outline-none"
         >
           {children}
         </select>
@@ -650,7 +654,7 @@ function DateInput({ label, value, onChange }: { label: string; value: string; o
         type="datetime-local"
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="w-full rounded-[18px] border border-orbit-line bg-white px-3 py-2 text-sm outline-none focus:border-orbit-line focus:outline-none focus:ring-0 focus-visible:outline-none"
+        className="w-full rounded-[18px] border border-orbit-line bg-orbit-panel px-3 py-2 text-sm outline-none focus:border-orbit-line focus:outline-none focus:ring-0 focus-visible:outline-none"
       />
     </label>
   );
@@ -676,19 +680,19 @@ function MarketplaceListingCard({
       onClick={onSelect}
       aria-pressed={selected}
       data-selected={selected ? "true" : "false"}
-      className="grid min-h-[240px] overflow-hidden rounded-[30px] border-2 border-transparent bg-white p-4 text-left shadow-[0_2px_14px_rgba(25,32,29,0.12)] transition-shadow data-[selected=true]:border-[#4391F5] hover:shadow-[0_2px_14px_rgba(25,32,29,0.18)] focus-visible:border-[#4391F5] focus-visible:outline-none focus-visible:shadow-[0_2px_14px_rgba(25,32,29,0.12)] md:min-h-[clamp(220px,16vw,270px)] md:grid-cols-[minmax(0,1fr)_40%]"
+      className="grid min-h-[240px] overflow-hidden rounded-[30px] border-2 border-transparent bg-orbit-panel p-4 text-left shadow-[0_2px_14px_rgba(25,32,29,0.12)] transition-shadow data-[selected=true]:border-orbit-green hover:shadow-[0_2px_14px_rgba(25,32,29,0.18)] focus-visible:border-orbit-green focus-visible:outline-none focus-visible:shadow-[0_2px_14px_rgba(25,32,29,0.12)] md:min-h-[clamp(220px,16vw,270px)] md:grid-cols-[minmax(0,1fr)_40%]"
     >
       <div className="flex min-w-0 flex-col justify-between gap-3 overflow-hidden pr-0 md:pr-3">
         <div>
           <div className="mb-4 flex flex-wrap items-center gap-2">
-            <span className="inline-flex h-[clamp(32px,2.4vw,36px)] items-center gap-2 rounded-full border border-orbit-line bg-white px-[clamp(10px,1vw,12px)] text-[clamp(10px,0.8vw,11px)] font-black uppercase tracking-normal text-orbit-ink">
+            <span className="orbit-tag inline-flex h-[clamp(32px,2.4vw,36px)] items-center gap-2 rounded-full border border-orbit-line bg-orbit-panel px-[clamp(10px,1vw,12px)] text-[clamp(10px,0.8vw,11px)] font-black uppercase tracking-normal text-orbit-ink">
               {listingIcon(listing.kind)}
               {listing.kind}
             </span>
             {unavailable ? (
-              <span className="inline-flex h-[clamp(32px,2.4vw,36px)] items-center rounded-full bg-orbit-clay px-[clamp(10px,1vw,12px)] text-[clamp(10px,0.8vw,11px)] font-black uppercase text-white">Booked</span>
+              <span className="orbit-tag inline-flex h-[clamp(32px,2.4vw,36px)] items-center rounded-full bg-orbit-clay px-[clamp(10px,1vw,12px)] text-[clamp(10px,0.8vw,11px)] font-black uppercase text-orbit-field">Booked</span>
             ) : (
-              <span className="inline-flex h-[clamp(32px,2.4vw,36px)] items-center rounded-full bg-[#e8e6e3]/85 px-[clamp(10px,1vw,12px)] text-[clamp(10px,0.8vw,11px)] font-black uppercase text-orbit-ink">
+              <span className="orbit-tag inline-flex h-[clamp(32px,2.4vw,36px)] items-center rounded-full bg-orbit-soft/85 px-[clamp(10px,1vw,12px)] text-[clamp(10px,0.8vw,11px)] font-black uppercase text-orbit-ink">
                 Available
               </span>
             )}
@@ -699,27 +703,27 @@ function MarketplaceListingCard({
         </div>
 
         <div className="flex flex-wrap items-center gap-2 text-[clamp(10px,0.8vw,11px)] font-black text-orbit-ink">
-          <span className="rounded-full bg-[#e8e6e3]/85 px-[clamp(10px,1vw,12px)] py-2">{listing.location.county}</span>
-          <span className="rounded-full bg-[#e8e6e3]/85 px-[clamp(10px,1vw,12px)] py-2">{rate}</span>
+          <span className="orbit-tag rounded-full bg-orbit-soft/85 px-[clamp(10px,1vw,12px)] py-2">{listing.location.county}</span>
+          <span className="orbit-tag rounded-full bg-orbit-soft/85 px-[clamp(10px,1vw,12px)] py-2">{rate}</span>
         </div>
       </div>
 
-      <div className="relative isolate mt-4 aspect-[16/9] min-h-[170px] self-stretch overflow-hidden rounded-[26px] bg-[#e8e6e3] md:mt-0 md:h-full md:min-h-[clamp(180px,14vw,240px)] md:aspect-auto">
+      <div className="relative isolate mt-4 aspect-[16/9] min-h-[170px] self-stretch overflow-hidden rounded-[26px] bg-orbit-soft md:mt-0 md:h-full md:min-h-[clamp(180px,14vw,240px)] md:aspect-auto">
         <img
           src={media?.url}
           alt={media?.alt ?? listing.title}
           className={`absolute inset-0 z-0 h-full w-full object-cover ${unavailable ? "grayscale" : ""}`}
         />
-        <span className="absolute right-[clamp(6px,2vw,8px)] top-[clamp(6px,2vw,8px)] z-10 flex h-[clamp(28px,8vw,32px)] w-[clamp(28px,8vw,32px)] items-center justify-center rounded-full bg-white/45 text-red-500 backdrop-blur">
+        <span className="image-overlay-element image-overlay-surface absolute right-[clamp(6px,2vw,8px)] top-[clamp(6px,2vw,8px)] z-10 flex h-[clamp(28px,8vw,32px)] w-[clamp(28px,8vw,32px)] items-center justify-center rounded-full bg-white/45 text-red-500 backdrop-blur">
           <Heart className="h-[clamp(12px,3.5vw,14px)] w-[clamp(12px,3.5vw,14px)] fill-current" aria-hidden="true" />
         </span>
-        <span className="absolute left-[clamp(6px,2vw,8px)] top-[clamp(6px,2vw,8px)] z-10 inline-flex h-[clamp(24px,7vw,28px)] items-center gap-1 rounded-full bg-white/70 px-[clamp(6px,2vw,8px)] text-[clamp(9px,2.8vw,10px)] font-black text-orbit-ink backdrop-blur">
+        <span className="image-overlay-element image-overlay-surface absolute left-[clamp(6px,2vw,8px)] top-[clamp(6px,2vw,8px)] z-10 inline-flex h-[clamp(24px,7vw,28px)] items-center gap-1 rounded-full bg-white/70 px-[clamp(6px,2vw,8px)] text-[clamp(9px,2.8vw,10px)] font-black text-orbit-ink backdrop-blur">
           {listing.rating.toFixed(1)}
           <span className="text-[clamp(8px,2.4vw,9px)] font-bold text-neutral-500">({listing.reviewCount})</span>
         </span>
-        <span className="absolute bottom-[clamp(6px,2vw,8px)] right-[clamp(6px,2vw,8px)] z-10 inline-flex h-[clamp(32px,9vw,35px)] items-center gap-1 rounded-full bg-[#c8bfb1]/90 p-[2px] pl-[clamp(10px,3vw,12px)] text-[clamp(10px,3vw,11px)] font-semibold text-orbit-ink backdrop-blur-md">
+        <span className="image-overlay-element image-overlay-surface absolute bottom-[clamp(6px,2vw,8px)] right-[clamp(6px,2vw,8px)] z-10 inline-flex h-[clamp(32px,9vw,35px)] items-center gap-1 rounded-full bg-[#c8bfb1]/90 p-[2px] pl-[clamp(10px,3vw,12px)] text-[clamp(10px,3vw,11px)] font-semibold text-orbit-ink backdrop-blur-md">
           Open
-          <span className="flex h-full aspect-square items-center justify-center rounded-full bg-black text-white">
+          <span className="image-overlay-element image-overlay-strong flex h-full aspect-square items-center justify-center rounded-full bg-black text-white">
             <ArrowUpRight className="h-[clamp(12px,3.5vw,14px)] w-[clamp(12px,3.5vw,14px)]" aria-hidden="true" />
           </span>
         </span>
@@ -728,11 +732,11 @@ function MarketplaceListingCard({
   );
 }
 
-function Metric({ label, value, tone }: { label: string; value: string; tone: "green" | "sky" | "clay" }) {
+function Metric({ label, value, tone }: { label: string; value: string; tone: "yellow" | "green" | "red" }) {
   const tones = {
-    green: "text-orbit-green",
-    sky: "text-orbit-sky",
-    clay: "text-orbit-clay"
+    yellow: "text-[#FFBD2E]",
+    green: "text-[#28C840]",
+    red: "text-[#FF5F57]"
   };
   return (
     <div className="rounded-[18px] border border-orbit-line bg-orbit-field p-2">

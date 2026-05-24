@@ -13,6 +13,7 @@ import {
   Sparkles,
   UserPlus
 } from "lucide-react";
+import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
@@ -249,14 +250,14 @@ const offerings: Offering[] = [
 
 export function HomeLanding() {
   return (
-    <main className="min-h-screen bg-[#eef0ec] text-orbit-ink">
+    <main className="min-h-screen bg-orbit-field text-orbit-ink">
       <section className="relative isolate flex min-h-svh overflow-hidden">
         <img src={heroImage} alt="RentOrbit marketplace scene" className="absolute inset-0 -z-20 h-full w-full object-cover" />
         <div className="absolute inset-0 -z-10 bg-black/45" />
         <div className="absolute inset-x-0 bottom-0 -z-10 h-44 bg-gradient-to-t from-black/55 to-transparent" />
 
-        <header className="absolute left-4 top-4 z-20 flex items-center gap-3 rounded-md bg-white/90 px-3 py-2 shadow-panel backdrop-blur sm:left-8 sm:top-8">
-          <div className="flex h-11 w-11 items-center justify-center rounded-md bg-orbit-green text-white">
+        <header className="absolute left-4 top-4 z-20 flex items-center gap-3 rounded-md bg-orbit-panel/90 px-3 py-2 shadow-panel backdrop-blur sm:left-8 sm:top-8">
+          <div className="flex h-11 w-11 items-center justify-center rounded-md bg-orbit-green text-orbit-field">
             <span className="text-lg font-black">RO</span>
           </div>
           <div>
@@ -265,23 +266,26 @@ export function HomeLanding() {
           </div>
         </header>
 
-        <Link
-          href="/account"
-          className="absolute right-4 top-4 z-20 inline-flex h-14 w-14 items-center justify-center rounded-full bg-white/90 text-orbit-ink shadow-panel backdrop-blur transition-colors hover:bg-white sm:right-8 sm:top-8"
-          title="Account"
-        >
-          <CircleUserRound className="h-7 w-7" aria-hidden="true" />
-          <span className="sr-only">Account</span>
-        </Link>
+        <div className="absolute right-4 top-4 z-20 flex items-center gap-2 sm:right-8 sm:top-8">
+          <ThemeSwitcher compact />
+          <Link
+            href="/account"
+            className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-orbit-panel/90 text-orbit-ink shadow-panel backdrop-blur transition-colors hover:bg-orbit-panel"
+            title="Account"
+          >
+            <CircleUserRound className="h-7 w-7" aria-hidden="true" />
+            <span className="sr-only">Account</span>
+          </Link>
+        </div>
 
         <div className="mx-auto flex w-full max-w-[1600px] items-end px-4 pb-28 pt-28 sm:px-8 lg:pb-32">
-          <div className="max-w-3xl text-white">
-            <div className="mb-5 inline-flex items-center gap-2 rounded-md bg-white/15 px-3 py-2 text-sm font-bold backdrop-blur">
+          <div className="image-overlay-element max-w-3xl text-white">
+            <div className="image-overlay-element image-overlay-surface mb-5 inline-flex items-center gap-2 rounded-md bg-white/15 px-3 py-2 text-sm font-bold backdrop-blur">
               <Sparkles className="h-4 w-4" aria-hidden="true" />
               Goods, personnel, and services
             </div>
             <h1 className="text-5xl font-black leading-none sm:text-7xl lg:text-8xl">RentOrbit</h1>
-            <p className="mt-5 max-w-2xl text-lg leading-8 text-white/85 sm:text-xl">
+            <p className="image-overlay-element mt-5 max-w-2xl text-lg leading-8 text-white/85 sm:text-xl">
               Rent what you need, list what you own, and keep every booking tied to verified identity, in-app terms, and secure payment records.
             </p>
           </div>
@@ -290,14 +294,14 @@ export function HomeLanding() {
         <div className="absolute bottom-6 left-4 z-20 flex flex-wrap gap-3 sm:left-8">
           <Link
             href="/account?mode=signup"
-            className="inline-flex min-h-12 items-center justify-center gap-2 rounded-md bg-white px-5 py-3 text-sm font-black text-orbit-ink shadow-panel transition hover:-translate-y-0.5"
+            className="image-overlay-element image-overlay-surface inline-flex min-h-12 items-center justify-center gap-2 rounded-md bg-orbit-panel px-5 py-3 text-sm font-black text-orbit-ink shadow-panel transition hover:-translate-y-0.5"
           >
             <UserPlus className="h-4 w-4" aria-hidden="true" />
             Sign up
           </Link>
           <Link
             href="/account"
-            className="inline-flex min-h-12 items-center justify-center gap-2 rounded-md border border-white/40 bg-black/35 px-5 py-3 text-sm font-black text-white backdrop-blur transition hover:-translate-y-0.5"
+            className="image-overlay-element image-overlay-surface inline-flex min-h-12 items-center justify-center gap-2 rounded-md border border-white/40 bg-black/35 px-5 py-3 text-sm font-black text-white backdrop-blur transition hover:-translate-y-0.5"
           >
             <LogIn className="h-4 w-4" aria-hidden="true" />
             Sign in
@@ -320,7 +324,7 @@ export function HomeLanding() {
             </div>
             <Link
               href="/marketplace"
-              className="inline-flex w-fit items-center gap-2 rounded-md border border-orbit-line bg-white px-4 py-3 text-sm font-black shadow-panel"
+              className="inline-flex w-fit items-center gap-2 rounded-md border border-orbit-line bg-orbit-panel px-4 py-3 text-sm font-black shadow-panel"
             >
               <Search className="h-4 w-4" aria-hidden="true" />
               Open marketplace
@@ -422,14 +426,14 @@ function OfferingPhone({ offering }: { offering: Offering }) {
         <div className="absolute inset-x-0 top-0 h-52 bg-gradient-to-b from-black/65 to-transparent" />
 
         <div className="absolute left-5 right-5 top-5 z-10 flex items-start justify-between gap-3">
-          <div className="min-w-0 text-white">
-            <div className="mb-3 inline-flex h-11 w-11 items-center justify-center rounded-full bg-white/20 backdrop-blur">
+          <div className="image-overlay-element min-w-0 text-white">
+            <div className="image-overlay-element image-overlay-surface mb-3 inline-flex h-11 w-11 items-center justify-center rounded-full bg-white/20 backdrop-blur">
               {offering.icon}
             </div>
             <h3 className="text-4xl font-black leading-none">{offering.title}</h3>
-            <p className="mt-2 max-w-[260px] text-sm font-semibold text-white/80">{offering.eyebrow}</p>
+            <p className="image-overlay-element mt-2 max-w-[260px] text-sm font-semibold text-white/80">{offering.eyebrow}</p>
           </div>
-          <Link href={`/marketplace?category=${offering.key}`} className="rounded-full bg-white px-4 py-3 text-sm font-black text-orbit-ink">
+          <Link href={`/marketplace?category=${offering.key}`} className="image-overlay-element image-overlay-surface rounded-full bg-orbit-panel px-4 py-3 text-sm font-black text-orbit-ink">
             View
           </Link>
         </div>
@@ -454,7 +458,7 @@ function OfferingPhone({ offering }: { offering: Offering }) {
         </div>
 
         <div className="pointer-events-none absolute inset-x-4 bottom-4 z-50 translate-y-5 opacity-0 transition duration-300 group-hover:pointer-events-auto group-hover:translate-y-0 group-hover:opacity-100">
-          <div className="mx-auto flex h-[75px] w-[clamp(280px,88%,620px)] items-center justify-between rounded-full bg-[#e8e6e3]/85 p-[3px] backdrop-blur-md">
+          <div className="mx-auto flex h-[75px] w-[clamp(280px,88%,620px)] items-center justify-between rounded-full bg-orbit-soft/85 p-[3px] backdrop-blur-md">
             <button
               type="button"
               onClick={(event) => {
@@ -463,7 +467,7 @@ function OfferingPhone({ offering }: { offering: Offering }) {
                 scrollByCard("left");
               }}
               disabled={!canSlideLeft}
-              className="inline-flex h-full aspect-square shrink-0 items-center justify-center rounded-full bg-[#f7f6f3] p-[0.5%] text-orbit-ink disabled:cursor-not-allowed disabled:grayscale disabled:opacity-45"
+              className="inline-flex h-full aspect-square shrink-0 items-center justify-center rounded-full bg-orbit-panel p-[0.5%] text-orbit-ink disabled:cursor-not-allowed disabled:grayscale disabled:opacity-45"
               title="Slide left"
               aria-label={`Show previous ${offering.title} listing`}
             >
@@ -478,7 +482,7 @@ function OfferingPhone({ offering }: { offering: Offering }) {
                 scrollByCard("right");
               }}
               disabled={!canSlideRight}
-              className="inline-flex h-full aspect-square shrink-0 items-center justify-center rounded-full bg-black p-[0.5%] text-white disabled:cursor-not-allowed disabled:grayscale disabled:opacity-45"
+              className="image-overlay-element image-overlay-strong inline-flex h-full aspect-square shrink-0 items-center justify-center rounded-full bg-black p-[0.5%] text-white disabled:cursor-not-allowed disabled:grayscale disabled:opacity-45"
               title="Slide right"
               aria-label={`Show next ${offering.title} listing`}
             >
@@ -501,14 +505,14 @@ function StackedListingPreview({ listing, index }: { listing: ListingCard; index
   return (
     <Link
       href={`/marketplace?listing=${encodeURIComponent(listing.title)}`}
-      className={`absolute overflow-hidden rounded-[30px] bg-white text-left shadow-[0_18px_45px_rgba(0,0,0,0.2)] transition duration-300 ${layers[index]}`}
+      className={`absolute overflow-hidden rounded-[30px] bg-orbit-panel text-left shadow-[0_18px_45px_rgba(0,0,0,0.2)] transition duration-300 ${layers[index]}`}
       style={{ transform: `scale(${1 - index * 0.06})` }}
     >
       <img src={listing.image} alt={listing.title} className="h-[62%] w-full object-cover" />
       <div className="grid gap-2 p-4">
         <div className="flex items-center justify-between gap-2">
           <span className="truncate text-2xl font-black text-orbit-ink">{listing.price.replace("KES ", "")}</span>
-          <span className="rounded-full bg-[#f7f6f3] px-3 py-2 text-xs font-black text-orbit-amber">4.9</span>
+          <span className="orbit-tag rounded-full bg-orbit-panel px-3 py-2 text-xs font-black text-orbit-amber">4.9</span>
         </div>
         <h4 className="line-clamp-2 text-base font-black text-orbit-ink">{listing.title}</h4>
         <p className="truncate text-sm font-semibold text-neutral-500">{listing.area}</p>
@@ -521,19 +525,19 @@ function ViewAllStack({ offering }: { offering: Offering }) {
   return (
     <Link
       href={`/marketplace?offering=${offering.key}`}
-      className="absolute inset-x-0 top-0 z-30 h-[78%] overflow-hidden rounded-[30px] bg-white text-left shadow-[0_18px_45px_rgba(0,0,0,0.2)] transition duration-300"
+      className="absolute inset-x-0 top-0 z-30 h-[78%] overflow-hidden rounded-[30px] bg-orbit-panel text-left shadow-[0_18px_45px_rgba(0,0,0,0.2)] transition duration-300"
     >
       <span className="relative block h-[62%] w-full overflow-hidden">
         <img src={offering.image} alt={`${offering.title} listings`} className="h-full w-full object-cover" />
         <span className="absolute inset-0 bg-black/30" />
-        <span className="absolute left-4 top-4 inline-flex h-12 w-12 items-center justify-center rounded-full bg-white/90 text-orbit-green">
+        <span className="image-overlay-element image-overlay-surface absolute left-4 top-4 inline-flex h-12 w-12 items-center justify-center rounded-full bg-white/90 text-orbit-green">
           {offering.icon}
         </span>
       </span>
       <span className="grid gap-2 p-4 text-center">
         <span className="text-2xl font-black text-orbit-ink">View all</span>
         <span className="text-base font-semibold text-neutral-600">{offering.title} listings across Kenya</span>
-        <span className="mx-auto mt-2 inline-flex h-[60px] w-fit items-center justify-center gap-2 rounded-full bg-black px-6 text-sm font-black text-white">
+        <span className="image-overlay-element image-overlay-strong mx-auto mt-2 inline-flex h-[60px] w-fit items-center justify-center gap-2 rounded-full bg-black px-6 text-sm font-black text-white">
           Open marketplace
           <ArrowRight className="h-4 w-4" aria-hidden="true" />
         </span>

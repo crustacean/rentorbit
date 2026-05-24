@@ -1,4 +1,5 @@
 import { BadgeCheck, CalendarClock, CircleUserRound, FileSignature, Heart, PackageCheck, ShieldCheck, WalletCards } from "lucide-react";
+import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import Link from "next/link";
 
 export type AccountDashboardProps = {
@@ -23,10 +24,10 @@ const accountTasks = [
 export function AccountDashboard({ email, onSignOut }: AccountDashboardProps) {
   return (
     <main className="min-h-screen bg-orbit-field text-orbit-ink">
-      <header className="border-b border-white/70 bg-white/90">
+      <header className="theme-body-border border-b border-white/70 bg-orbit-panel/90">
         <div className="mx-auto flex max-w-[1400px] items-center justify-between gap-3 px-4 py-4 sm:px-8">
           <Link href="/" className="flex min-w-0 items-center gap-3" aria-label="RentOrbit home">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-orbit-green text-white">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-orbit-green text-orbit-field">
               <span className="text-lg font-black">RO</span>
             </div>
             <div className="min-w-0">
@@ -35,12 +36,13 @@ export function AccountDashboard({ email, onSignOut }: AccountDashboardProps) {
             </div>
           </Link>
           <div className="flex shrink-0 items-center gap-2">
-            <button onClick={onSignOut} className="rounded-full border border-orbit-line bg-white/90 px-4 py-3 text-sm font-black">
+            <ThemeSwitcher compact />
+            <button onClick={onSignOut} className="rounded-full border border-orbit-line bg-orbit-panel/90 px-4 py-3 text-sm font-black">
               Sign out
             </button>
             <Link
               href="/account"
-              className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-white/90 text-orbit-ink shadow-[0_2px_14px_rgba(25,32,29,0.12)] backdrop-blur transition-colors hover:bg-white focus-visible:outline-none"
+              className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-orbit-panel/90 text-orbit-ink shadow-[0_2px_14px_rgba(25,32,29,0.12)] backdrop-blur transition-colors hover:bg-orbit-panel focus-visible:outline-none"
               title="Account"
             >
               <CircleUserRound className="h-7 w-7" aria-hidden="true" />
@@ -54,8 +56,8 @@ export function AccountDashboard({ email, onSignOut }: AccountDashboardProps) {
         <div className="grid gap-4">
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {accountStats.map((stat) => (
-              <div key={stat.label} className="rounded-md border border-orbit-line bg-white p-4 shadow-panel">
-                <div className="mb-4 inline-flex h-11 w-11 items-center justify-center rounded-md bg-emerald-50 text-orbit-green">
+              <div key={stat.label} className="rounded-md border border-orbit-line bg-orbit-panel p-4 shadow-panel">
+                <div className="mb-4 inline-flex h-11 w-11 items-center justify-center rounded-md bg-orbit-soft text-orbit-green">
                   {stat.icon}
                 </div>
                 <p className="text-3xl font-black">{stat.value}</p>
@@ -64,7 +66,7 @@ export function AccountDashboard({ email, onSignOut }: AccountDashboardProps) {
             ))}
           </div>
 
-          <div className="rounded-md border border-orbit-line bg-white p-5 shadow-panel">
+          <div className="rounded-md border border-orbit-line bg-orbit-panel p-5 shadow-panel">
             <div className="mb-5 flex items-center justify-between gap-3">
               <h2 className="text-xl font-black">Bookings timeline</h2>
               <CalendarClock className="h-5 w-5 text-orbit-green" aria-hidden="true" />
@@ -78,7 +80,7 @@ export function AccountDashboard({ email, onSignOut }: AccountDashboardProps) {
                     </span>
                     <p className="truncate text-sm font-bold">{task}</p>
                   </div>
-                  <button className="rounded-md bg-orbit-green px-3 py-2 text-xs font-black text-white">Open</button>
+                  <button className="rounded-md bg-orbit-green px-3 py-2 text-xs font-black text-orbit-field">Open</button>
                 </div>
               ))}
             </div>
@@ -86,12 +88,12 @@ export function AccountDashboard({ email, onSignOut }: AccountDashboardProps) {
         </div>
 
         <aside className="grid gap-4">
-          <div className="rounded-md border border-orbit-line bg-white p-5 shadow-panel">
+          <div className="rounded-md border border-orbit-line bg-orbit-panel p-5 shadow-panel">
             <ShieldCheck className="mb-4 h-7 w-7 text-orbit-green" aria-hidden="true" />
             <h2 className="text-lg font-black">Verified access</h2>
             <p className="mt-2 text-sm leading-6 text-neutral-600">KYC, contract signatures, deposits, and listing management are ready for this account.</p>
           </div>
-          <div className="rounded-md border border-orbit-line bg-white p-5 shadow-panel">
+          <div className="rounded-md border border-orbit-line bg-orbit-panel p-5 shadow-panel">
             <WalletCards className="mb-4 h-7 w-7 text-orbit-sky" aria-hidden="true" />
             <h2 className="text-lg font-black">Payments</h2>
             <p className="mt-2 text-sm leading-6 text-neutral-600">M-Pesa/card ledger events, refundable deposits, and payout reconciliation will appear here.</p>
