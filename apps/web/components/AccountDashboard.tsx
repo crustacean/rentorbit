@@ -1,4 +1,5 @@
-import { BadgeCheck, CalendarClock, FileSignature, Heart, PackageCheck, ShieldCheck, WalletCards } from "lucide-react";
+import { BadgeCheck, CalendarClock, CircleUserRound, FileSignature, Heart, PackageCheck, ShieldCheck, WalletCards } from "lucide-react";
+import Link from "next/link";
 
 export type AccountDashboardProps = {
   email: string;
@@ -22,16 +23,30 @@ const accountTasks = [
 export function AccountDashboard({ email, onSignOut }: AccountDashboardProps) {
   return (
     <main className="min-h-screen bg-orbit-field text-orbit-ink">
-      <header className="border-b border-orbit-line bg-white">
-        <div className="mx-auto flex max-w-[1400px] flex-col gap-4 px-4 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-8">
-          <div>
-            <p className="text-sm font-black uppercase text-orbit-green">RentOrbit account</p>
-            <h1 className="mt-1 text-3xl font-black">Welcome back</h1>
-            <p className="mt-1 text-sm font-semibold text-neutral-600">{email}</p>
+      <header className="border-b border-white/70 bg-white/90">
+        <div className="mx-auto flex max-w-[1400px] items-center justify-between gap-3 px-4 py-4 sm:px-8">
+          <Link href="/" className="flex min-w-0 items-center gap-3" aria-label="RentOrbit home">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-orbit-green text-white">
+              <span className="text-lg font-black">RO</span>
+            </div>
+            <div className="min-w-0">
+              <p className="truncate text-xl font-black leading-none text-orbit-ink sm:text-2xl">RentOrbit</p>
+              <p className="mt-1 truncate text-sm font-semibold text-neutral-600">Account workspace</p>
+            </div>
+          </Link>
+          <div className="flex shrink-0 items-center gap-2">
+            <button onClick={onSignOut} className="rounded-full border border-orbit-line bg-white/90 px-4 py-3 text-sm font-black">
+              Sign out
+            </button>
+            <Link
+              href="/account"
+              className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-white/90 text-orbit-ink shadow-[0_2px_14px_rgba(25,32,29,0.12)] backdrop-blur transition-colors hover:bg-white focus-visible:outline-none"
+              title="Account"
+            >
+              <CircleUserRound className="h-7 w-7" aria-hidden="true" />
+              <span className="sr-only">Account</span>
+            </Link>
           </div>
-          <button onClick={onSignOut} className="w-fit rounded-md border border-orbit-line bg-white px-4 py-3 text-sm font-black">
-            Sign out
-          </button>
         </div>
       </header>
 

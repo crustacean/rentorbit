@@ -1,4 +1,8 @@
-RentOrbit: I want to create a web based application where people can list stuff they want to rent out. This could be a service, goods or even personnel. Renter can list out the goods, add pictures, set rules such as length of time to rent, cost, initial deposit if any, delivery if any, or renter picks the item by themselves etc, The item would become unavailable, probably add a grayscale if it has been rented out. it comes back online when returned. People can log in and rent these things, jump into a Direct-Message (DM) for further communication if need be. The system will allow for geo location, when someone is looking for something to rent, can choose area within a radius, or country wide. The item will show the general area where it is currently located.
+RentOrbit: I want to create a web based application where people can list stuff they want to rent out. This could be a service, goods or even personnel. 
+Renter can list out the goods, add pictures, set rules such as length of time to rent, cost, initial deposit if any, delivery if any, or renter picks the item 
+by themselves etc, The item would become unavailable, probably add a grayscale if it has been rented out. it comes back online when returned. 
+People can log in and rent these things, jump into a Direct-Message (DM) for further communication if need be. The system will allow for geo location, 
+when someone is looking for something to rent, can choose area within a radius, or country wide. The item will show the general area where it is currently located.
 
 Create a plan to implement this, including tech stack for front end, middle, and back end.
 

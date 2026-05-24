@@ -14,7 +14,7 @@ import {
   UserPlus
 } from "lucide-react";
 import Link from "next/link";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type OfferingKey = "goods" | "personnel" | "services";
 
@@ -342,14 +342,25 @@ function OfferingPhone({ offering }: { offering: Offering }) {
   const [activeIndex, setActiveIndex] = useState(0);
   const [isFading, setIsFading] = useState(false);
   const fadeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pointerStartX = useRef<number | null>(null);
   const viewAllIndex = offering.listings.length;
   const isViewAllPage = activeIndex === viewAllIndex;
   const canSlideLeft = activeIndex > 0;
   const canSlideRight = activeIndex < viewAllIndex;
   const stackListings = [0, 1, 2].map((offset) => offering.listings[activeIndex + offset]);
 
+  useEffect(() => {
+    return () => {
+      if (fadeTimer.current) {
+        clearTimeout(fadeTimer.current);
+      }
+    };
+  }, []);
+
   function scrollByCard(direction: "left" | "right") {
-    if ((direction === "left" && !canSlideLeft) || (direction === "right" && !canSlideRight)) {
+    const nextIndex = direction === "left" ? Math.max(0, activeIndex - 1) : Math.min(viewAllIndex, activeIndex + 1);
+
+    if (nextIndex === activeIndex) {
       return;
     }
 
@@ -358,20 +369,53 @@ function OfferingPhone({ offering }: { offering: Offering }) {
     }
 
     setIsFading(true);
-    fadeTimer.current = setTimeout(() => {
-      setActiveIndex((current) => {
-        if (direction === "left") {
-          return Math.max(0, current - 1);
-        }
+    setActiveIndex(nextIndex);
 
-        return Math.min(viewAllIndex, current + 1);
-      });
+    fadeTimer.current = setTimeout(() => {
       setIsFading(false);
     }, 180);
   }
 
+  function handlePointerDown(event: React.PointerEvent<HTMLElement>) {
+    pointerStartX.current = event.clientX;
+  }
+
+  function handlePointerUp(event: React.PointerEvent<HTMLElement>) {
+    if (pointerStartX.current === null) {
+      return;
+    }
+
+    const distance = event.clientX - pointerStartX.current;
+    pointerStartX.current = null;
+
+    if (Math.abs(distance) < 48) {
+      return;
+    }
+
+    event.preventDefault();
+    scrollByCard(distance < 0 ? "right" : "left");
+  }
+
+  function handleKeyDown(event: React.KeyboardEvent<HTMLElement>) {
+    if (event.key === "ArrowLeft") {
+      event.preventDefault();
+      scrollByCard("left");
+    }
+
+    if (event.key === "ArrowRight") {
+      event.preventDefault();
+      scrollByCard("right");
+    }
+  }
+
   return (
-    <article className="group relative h-[80svh] min-h-[640px] overflow-hidden rounded-[34px] bg-transparent shadow-[0_2px_12px_rgba(25,32,29,0.24)] xl:h-full xl:min-h-0">
+    <article
+      className="group relative h-[80svh] min-h-[640px] overflow-hidden rounded-[34px] bg-transparent shadow-[0_2px_12px_rgba(25,32,29,0.24)] outline-none xl:h-full xl:min-h-0"
+      tabIndex={0}
+      onKeyDown={handleKeyDown}
+      onPointerDown={handlePointerDown}
+      onPointerUp={handlePointerUp}
+    >
       <div className="relative h-full overflow-hidden rounded-[34px] bg-neutral-200">
         <img src={offering.image} alt={`${offering.title} rentals`} className="absolute inset-0 h-full w-full object-cover" />
         <div className="absolute inset-0 bg-black/25 transition duration-300 group-hover:bg-black/45" />
@@ -391,10 +435,14 @@ function OfferingPhone({ offering }: { offering: Offering }) {
         </div>
 
         <div
-          className={`absolute left-1/2 top-[18%] z-20 h-[70%] w-[clamp(280px,72%,520px)] -translate-x-1/2 opacity-0 transition duration-300 ${
-            isFading ? "scale-[0.96] group-hover:opacity-0" : "scale-100 group-hover:opacity-100"
+          className={`pointer-events-none absolute left-1/2 top-[18%] z-20 h-[70%] w-[clamp(280px,72%,520px)] -translate-x-1/2 opacity-0 transition duration-300 group-hover:pointer-events-auto group-hover:opacity-100 ${
+            isFading
+              ? "scale-[0.98] group-hover:opacity-75"
+              : "scale-100"
           }`}
+          key={`${offering.key}-${activeIndex}`}
           aria-label={`${offering.title} sample listings`}
+          aria-live="polite"
         >
           {isViewAllPage ? (
             <ViewAllStack offering={offering} />
@@ -405,22 +453,34 @@ function OfferingPhone({ offering }: { offering: Offering }) {
           )}
         </div>
 
-        <div className="absolute inset-x-4 bottom-4 z-30 translate-y-5 opacity-0 transition duration-300 group-hover:translate-y-0 group-hover:opacity-100">
+        <div className="pointer-events-none absolute inset-x-4 bottom-4 z-50 translate-y-5 opacity-0 transition duration-300 group-hover:pointer-events-auto group-hover:translate-y-0 group-hover:opacity-100">
           <div className="mx-auto flex h-[75px] w-[clamp(280px,88%,620px)] items-center justify-between rounded-full bg-[#e8e6e3]/85 p-[3px] backdrop-blur-md">
             <button
-              onClick={() => scrollByCard("left")}
+              type="button"
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                scrollByCard("left");
+              }}
               disabled={!canSlideLeft}
               className="inline-flex h-full aspect-square shrink-0 items-center justify-center rounded-full bg-[#f7f6f3] p-[0.5%] text-orbit-ink disabled:cursor-not-allowed disabled:grayscale disabled:opacity-45"
               title="Slide left"
+              aria-label={`Show previous ${offering.title} listing`}
             >
               <ArrowLeft className="h-5 w-5" aria-hidden="true" />
             </button>
-            <span className="text-[18px] font-semibold text-orbit-ink">{isViewAllPage ? "View all listings" : "Slide left and right"}</span>
+            <span className="text-center text-[18px] font-semibold text-orbit-ink">Slide left and right</span>
             <button
-              onClick={() => scrollByCard("right")}
+              type="button"
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                scrollByCard("right");
+              }}
               disabled={!canSlideRight}
               className="inline-flex h-full aspect-square shrink-0 items-center justify-center rounded-full bg-black p-[0.5%] text-white disabled:cursor-not-allowed disabled:grayscale disabled:opacity-45"
               title="Slide right"
+              aria-label={`Show next ${offering.title} listing`}
             >
               <ArrowRight className="h-5 w-5" aria-hidden="true" />
             </button>

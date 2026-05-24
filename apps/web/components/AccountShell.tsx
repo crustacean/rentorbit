@@ -53,6 +53,15 @@ const sessionKey = "rentorbit:account-session";
 const accountsKey = "rentorbit:accounts";
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 const idTypes: IdType[] = ["National ID", "Passport number", "Alien ID"];
+const formRailClass =
+  "flex h-[75px] items-center gap-3 rounded-full bg-[#e8e6e3]/85 p-[3px] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.42)] backdrop-blur-md transition focus-within:shadow-[inset_0_0_0_2px_rgba(15,118,110,0.8)]";
+const formIconClass = "flex h-full aspect-square shrink-0 items-center justify-center rounded-full bg-[#f7f6f3] text-neutral-600";
+const formInputClass =
+  "min-w-0 flex-1 bg-transparent px-1 text-base font-semibold text-orbit-ink outline-none placeholder:text-neutral-500 focus-visible:outline-none";
+const formActionClass =
+  "flex h-[75px] w-full items-center justify-center rounded-full bg-black px-6 text-sm font-black text-white transition disabled:cursor-not-allowed disabled:grayscale disabled:opacity-45";
+const formSuccessActionClass =
+  "flex h-[75px] w-full items-center justify-center rounded-full bg-orbit-green px-6 text-sm font-black text-white transition disabled:cursor-not-allowed disabled:grayscale disabled:opacity-45";
 
 let dashboardImport: Promise<{ AccountDashboard: DashboardComponent }> | null = null;
 
@@ -364,23 +373,25 @@ export function AccountShell({ initialMode }: { initialMode: AccountMode }) {
       <div className="absolute inset-0 bg-black/55" />
 
       <section className="relative z-10 grid min-h-screen place-items-center px-4 py-8">
-        <div className="w-full max-w-md rounded-md border border-white/30 bg-white/94 p-5 shadow-panel backdrop-blur">
-          <div className="mb-5">
+        <div className="w-full max-w-lg rounded-[34px] border border-white/30 bg-white/94 p-5 shadow-panel backdrop-blur">
+          <div className="mb-6 px-2">
             <p className="text-sm font-black uppercase text-orbit-green">Account</p>
             <h1 className="mt-1 text-3xl font-black">{mode === "signup" ? "Sign up" : "Sign in"}</h1>
           </div>
 
           {mode === "signup" ? (
             <div className="grid gap-4">
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid gap-4">
                 <label className="block">
-                  <span className="mb-1 block text-xs font-black uppercase text-neutral-500">First name</span>
-                  <div className="flex min-h-12 items-center gap-2 border border-orbit-line bg-white px-3">
-                    <UserRound className="h-4 w-4 shrink-0 text-neutral-500" aria-hidden="true" />
+                  <span className="mb-2 block px-3 text-xs font-black uppercase text-neutral-500">First name</span>
+                  <div className={formRailClass}>
+                    <span className={formIconClass}>
+                      <UserRound className="h-5 w-5" aria-hidden="true" />
+                    </span>
                     <input
                       value={firstName}
                       onChange={(event) => setFirstName(event.target.value)}
-                      className="min-w-0 flex-1 bg-transparent text-sm font-semibold outline-none"
+                      className={formInputClass}
                       type="text"
                       autoComplete="given-name"
                     />
@@ -388,13 +399,15 @@ export function AccountShell({ initialMode }: { initialMode: AccountMode }) {
                 </label>
 
                 <label className="block">
-                  <span className="mb-1 block text-xs font-black uppercase text-neutral-500">Last name</span>
-                  <div className="flex min-h-12 items-center gap-2 border border-orbit-line bg-white px-3">
-                    <UserRound className="h-4 w-4 shrink-0 text-neutral-500" aria-hidden="true" />
+                  <span className="mb-2 block px-3 text-xs font-black uppercase text-neutral-500">Last name</span>
+                  <div className={formRailClass}>
+                    <span className={formIconClass}>
+                      <UserRound className="h-5 w-5" aria-hidden="true" />
+                    </span>
                     <input
                       value={lastName}
                       onChange={(event) => setLastName(event.target.value)}
-                      className="min-w-0 flex-1 bg-transparent text-sm font-semibold outline-none"
+                      className={formInputClass}
                       type="text"
                       autoComplete="family-name"
                     />
@@ -403,13 +416,15 @@ export function AccountShell({ initialMode }: { initialMode: AccountMode }) {
               </div>
 
               <label className="block">
-                <span className="mb-1 block text-xs font-black uppercase text-neutral-500">ID type</span>
-                <div className="relative flex min-h-12 items-center gap-2 border border-orbit-line bg-white px-3">
-                  <IdCard className="h-4 w-4 shrink-0 text-neutral-500" aria-hidden="true" />
+                <span className="mb-2 block px-3 text-xs font-black uppercase text-neutral-500">ID type</span>
+                <div className={formRailClass}>
+                  <span className={formIconClass}>
+                    <IdCard className="h-5 w-5" aria-hidden="true" />
+                  </span>
                   <select
                     value={idType}
                     onChange={(event) => setIdType(event.target.value as IdType)}
-                    className="min-w-0 flex-1 appearance-none bg-transparent text-sm font-semibold outline-none"
+                    className={`${formInputClass} appearance-none`}
                   >
                     {idTypes.map((option) => (
                       <option key={option} value={option}>
@@ -417,35 +432,43 @@ export function AccountShell({ initialMode }: { initialMode: AccountMode }) {
                       </option>
                     ))}
                   </select>
-                  <ChevronDown className="h-4 w-4 shrink-0 text-neutral-500" aria-hidden="true" />
+                  <span className="mr-3 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/50 text-neutral-600">
+                    <ChevronDown className="h-4 w-4" aria-hidden="true" />
+                  </span>
                 </div>
               </label>
 
               <label className="block">
-                <span className="mb-1 block text-xs font-black uppercase text-neutral-500">ID number</span>
-                <div className="flex min-h-12 items-center gap-2 border border-orbit-line bg-white px-3">
-                  <ShieldCheck className="h-4 w-4 shrink-0 text-neutral-500" aria-hidden="true" />
+                <span className="mb-2 block px-3 text-xs font-black uppercase text-neutral-500">ID number</span>
+                <div className={formRailClass}>
+                  <span className={formIconClass}>
+                    <ShieldCheck className="h-5 w-5" aria-hidden="true" />
+                  </span>
                   <input
                     value={idNumber}
                     onChange={(event) => setIdNumber(event.target.value)}
-                    className="min-w-0 flex-1 bg-transparent text-sm font-semibold uppercase outline-none"
+                    className={`${formInputClass} uppercase`}
                     type="text"
                     autoComplete="off"
                   />
-                  {identityVerified ? <CheckCircle2 className="h-4 w-4 shrink-0 text-orbit-green" aria-hidden="true" /> : null}
+                  {identityVerified ? (
+                    <span className="mr-3 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/65 text-orbit-green">
+                      <CheckCircle2 className="h-5 w-5" aria-hidden="true" />
+                    </span>
+                  ) : null}
                 </div>
               </label>
 
               <button
                 onClick={verifyIdentity}
                 disabled={!identityReady || iprsStatus === "checking"}
-                className="min-h-12 rounded-md bg-orbit-ink px-4 py-3 text-sm font-black text-white disabled:cursor-not-allowed disabled:grayscale disabled:opacity-45"
+                className={formActionClass}
               >
                 {iprsStatus === "checking" ? "Checking IPRS" : "Validate ID"}
               </button>
 
               {identityVerified ? (
-                <div className="grid gap-4 border-t border-orbit-line pt-4">
+                <div className="grid gap-4 border-t border-orbit-line pt-5">
                   <CredentialFields
                     email={email}
                     emailValid={emailValid}
@@ -466,7 +489,7 @@ export function AccountShell({ initialMode }: { initialMode: AccountMode }) {
                   <button
                     onClick={signup}
                     disabled={!canSignup}
-                    className="min-h-12 rounded-md bg-orbit-green px-4 py-3 text-sm font-black text-white disabled:cursor-not-allowed disabled:grayscale disabled:opacity-45"
+                    className={formSuccessActionClass}
                   >
                     {isSubmitting ? "Creating account" : "Create account"}
                   </button>
@@ -495,7 +518,7 @@ export function AccountShell({ initialMode }: { initialMode: AccountMode }) {
               <button
                 onClick={signin}
                 disabled={!canSignin}
-                className="min-h-12 rounded-md bg-orbit-green px-4 py-3 text-sm font-black text-white disabled:cursor-not-allowed disabled:grayscale disabled:opacity-45"
+                className={formSuccessActionClass}
               >
                 {isSubmitting ? "Signing in" : "Sign in"}
               </button>
@@ -578,63 +601,81 @@ function CredentialFields({
   return (
     <>
       <label className="block">
-        <span className="mb-1 block text-xs font-black uppercase text-neutral-500">Email</span>
-        <div className="flex min-h-12 items-center gap-2 border border-orbit-line bg-white px-3">
-          <Mail className="h-4 w-4 shrink-0 text-neutral-500" aria-hidden="true" />
+        <span className="mb-2 block px-3 text-xs font-black uppercase text-neutral-500">Email</span>
+        <div className={formRailClass}>
+          <span className={formIconClass}>
+            <Mail className="h-5 w-5" aria-hidden="true" />
+          </span>
           <input
             value={email}
             onChange={(event) => setEmail(event.target.value)}
-            className="min-w-0 flex-1 bg-transparent text-sm font-semibold outline-none"
+            className={formInputClass}
             type="email"
             autoComplete="email"
           />
-          {emailValid ? <CheckCircle2 className="h-4 w-4 shrink-0 text-orbit-green" aria-hidden="true" /> : null}
+          {emailValid ? (
+            <span className="mr-3 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/65 text-orbit-green">
+              <CheckCircle2 className="h-5 w-5" aria-hidden="true" />
+            </span>
+          ) : null}
         </div>
       </label>
 
       <label className="block">
-        <span className="mb-1 block text-xs font-black uppercase text-neutral-500">Password</span>
-        <div className="flex min-h-12 items-center gap-2 border border-orbit-line bg-white px-3">
-          <LockKeyhole className="h-4 w-4 shrink-0 text-neutral-500" aria-hidden="true" />
+        <span className="mb-2 block px-3 text-xs font-black uppercase text-neutral-500">Password</span>
+        <div className={formRailClass}>
+          <span className={formIconClass}>
+            <LockKeyhole className="h-5 w-5" aria-hidden="true" />
+          </span>
           <input
             value={password}
             onChange={(event) => setPassword(event.target.value)}
-            className="min-w-0 flex-1 bg-transparent text-sm font-semibold outline-none"
+            className={formInputClass}
             type={showPassword ? "text" : "password"}
             autoComplete={mode === "signup" ? "new-password" : "current-password"}
           />
-          {passwordValid ? <CheckCircle2 className="h-4 w-4 shrink-0 text-orbit-green" aria-hidden="true" /> : null}
+          {passwordValid ? (
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/65 text-orbit-green">
+              <CheckCircle2 className="h-5 w-5" aria-hidden="true" />
+            </span>
+          ) : null}
           <button
             type="button"
             onClick={() => setShowPassword((current) => !current)}
-            className="rounded-md p-1 text-neutral-600"
+            className="mr-1 flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white/65 text-neutral-600 focus-visible:outline-none"
             title={showPassword ? "Hide password" : "Show password"}
           >
-            {showPassword ? <EyeOff className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}
+            {showPassword ? <EyeOff className="h-5 w-5" aria-hidden="true" /> : <Eye className="h-5 w-5" aria-hidden="true" />}
           </button>
         </div>
       </label>
 
       {mode === "signup" ? (
         <label className="block">
-          <span className="mb-1 block text-xs font-black uppercase text-neutral-500">Confirm password</span>
-          <div className="flex min-h-12 items-center gap-2 border border-orbit-line bg-white px-3">
-            <LockKeyhole className="h-4 w-4 shrink-0 text-neutral-500" aria-hidden="true" />
+          <span className="mb-2 block px-3 text-xs font-black uppercase text-neutral-500">Confirm password</span>
+          <div className={formRailClass}>
+            <span className={formIconClass}>
+              <LockKeyhole className="h-5 w-5" aria-hidden="true" />
+            </span>
             <input
               value={confirmPassword}
               onChange={(event) => setConfirmPassword(event.target.value)}
-              className="min-w-0 flex-1 bg-transparent text-sm font-semibold outline-none"
+              className={formInputClass}
               type={showConfirmPassword ? "text" : "password"}
               autoComplete="new-password"
             />
-            {confirmPassword && passwordsMatch ? <CheckCircle2 className="h-4 w-4 shrink-0 text-orbit-green" aria-hidden="true" /> : null}
+            {confirmPassword && passwordsMatch ? (
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/65 text-orbit-green">
+                <CheckCircle2 className="h-5 w-5" aria-hidden="true" />
+              </span>
+            ) : null}
             <button
               type="button"
               onClick={() => setShowConfirmPassword((current) => !current)}
-              className="rounded-md p-1 text-neutral-600"
+              className="mr-1 flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white/65 text-neutral-600 focus-visible:outline-none"
               title={showConfirmPassword ? "Hide password" : "Show password"}
             >
-              {showConfirmPassword ? <EyeOff className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}
+              {showConfirmPassword ? <EyeOff className="h-5 w-5" aria-hidden="true" /> : <Eye className="h-5 w-5" aria-hidden="true" />}
             </button>
           </div>
         </label>
