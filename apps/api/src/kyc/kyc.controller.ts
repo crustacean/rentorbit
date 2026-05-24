@@ -1,5 +1,5 @@
 import { Body, Controller, Inject, Post } from "@nestjs/common";
-import { KycService } from "./kyc.service.js";
+import { type IprsCheckRequest, KycService } from "./kyc.service.js";
 
 @Controller("kyc")
 export class KycController {
@@ -8,6 +8,11 @@ export class KycController {
   @Post("start")
   start(@Body() body: { userId: string }) {
     return this.kycService.startVerification(body.userId);
+  }
+
+  @Post("iprs-check")
+  iprsCheck(@Body() body: IprsCheckRequest) {
+    return this.kycService.validateIprsIdentity(body);
   }
 
   @Post("provider-callback/verified")

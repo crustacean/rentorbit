@@ -1,6 +1,18 @@
 "use client";
 
-import { ArrowLeft, ArrowRight, BadgeCheck, Camera, Drill, Headphones, LogIn, Search, Sparkles, UserPlus } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  BadgeCheck,
+  Camera,
+  CircleUserRound,
+  Drill,
+  Headphones,
+  LogIn,
+  Search,
+  Sparkles,
+  UserPlus
+} from "lucide-react";
 import Link from "next/link";
 import { useRef, useState } from "react";
 
@@ -253,6 +265,15 @@ export function HomeLanding() {
           </div>
         </header>
 
+        <Link
+          href="/account"
+          className="absolute right-4 top-4 z-20 inline-flex h-14 w-14 items-center justify-center rounded-full bg-white/90 text-orbit-ink shadow-panel backdrop-blur transition-colors hover:bg-white sm:right-8 sm:top-8"
+          title="Account"
+        >
+          <CircleUserRound className="h-7 w-7" aria-hidden="true" />
+          <span className="sr-only">Account</span>
+        </Link>
+
         <div className="mx-auto flex w-full max-w-[1600px] items-end px-4 pb-28 pt-28 sm:px-8 lg:pb-32">
           <div className="max-w-3xl text-white">
             <div className="mb-5 inline-flex items-center gap-2 rounded-md bg-white/15 px-3 py-2 text-sm font-bold backdrop-blur">
@@ -268,14 +289,14 @@ export function HomeLanding() {
 
         <div className="absolute bottom-6 left-4 z-20 flex flex-wrap gap-3 sm:left-8">
           <Link
-            href="/marketplace?intent=signup"
+            href="/account?mode=signup"
             className="inline-flex min-h-12 items-center justify-center gap-2 rounded-md bg-white px-5 py-3 text-sm font-black text-orbit-ink shadow-panel transition hover:-translate-y-0.5"
           >
             <UserPlus className="h-4 w-4" aria-hidden="true" />
             Sign up
           </Link>
           <Link
-            href="/marketplace?intent=signin"
+            href="/account"
             className="inline-flex min-h-12 items-center justify-center gap-2 rounded-md border border-white/40 bg-black/35 px-5 py-3 text-sm font-black text-white backdrop-blur transition hover:-translate-y-0.5"
           >
             <LogIn className="h-4 w-4" aria-hidden="true" />

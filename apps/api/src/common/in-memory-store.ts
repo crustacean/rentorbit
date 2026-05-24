@@ -3,7 +3,12 @@ import { seededListings, type ContractSummary, type KycStatus, type ResourceList
 export type UserRecord = {
   id: string;
   email: string;
+  password?: string;
+  firstName?: string;
+  lastName?: string;
   legalName: string;
+  idType?: "National ID" | "Passport number" | "Alien ID";
+  idNumberLast4?: string;
   kycStatus: KycStatus;
   createdAt: string;
 };
