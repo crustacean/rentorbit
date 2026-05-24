@@ -1,0 +1,342 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  renter
+  owner
+  admin
+}
+
+enum KycStatus {
+  not_started
+  pending
+  verified
+  rejected
+  expired
+}
+
+enum ListingKind {
+  good
+  service
+  personnel
+}
+
+enum ListingStatus {
+  draft
+  active
+  paused
+  suspended
+}
+
+enum OperationMode {
+  self_operated
+  owner_operated
+  operator_only
+}
+
+enum DeliveryMode {
+  pickup
+  local_delivery
+  regional_delivery
+  countrywide_delivery
+}
+
+enum BookingStatus {
+  proposal
+  awaiting_signatures
+  awaiting_payment
+  booked
+  active
+  returned
+  disputed
+  cancelled
+  completed
+}
+
+enum ContractStatus {
+  draft
+  partially_signed
+  fully_executed
+  voided
+}
+
+enum MessageType {
+  text
+  image
+  booking_proposal
+  contract_summary
+  system_event
+}
+
+enum LedgerEntryType {
+  rental_fee
+  platform_fee
+  refundable_deposit
+  owner_payout
+  refund
+  dispute_hold
+}
+
+enum LedgerEntryStatus {
+  pending
+  succeeded
+  failed
+  reversed
+  held
+}
+
+enum DisputeStatus {
+  open
+  evidence_requested
+  under_review
+  resolved_owner
+  resolved_renter
+  split_resolution
+  cancelled
+}
+
+model User {
+  id             String            @id @default(cuid())
+  email          String            @unique
+  phone          String?           @unique
+  legalName      String?
+  role           UserRole          @default(renter)
+  kycStatus      KycStatus         @default(not_started)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  listings       Listing[]         @relation("OwnerListings")
+  renterThreads  ChatThread[]      @relation("RenterThreads")
+  ownerThreads   ChatThread[]      @relation("OwnerThreads")
+  sentMessages   ChatMessage[]
+  signatures     ContractSignature[]
+  ledgerEntries  PaymentLedgerEntry[]
+  kycChecks      KycVerification[]
+  savedSearches  SavedSearch[]
+}
+
+model KycVerification {
+  id                String    @id @default(cuid())
+  userId            String
+  provider          String
+  providerReference String?
+  status            KycStatus @default(pending)
+  idNumberLast4     String?
+  verifiedAt        DateTime?
+  rawResult         Json?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+}
+
+model Category {
+  id        String    @id
+  label     String
+  examples  String[]
+  active    Boolean   @default(true)
+  listings  Listing[]
+}
+
+model Listing {
+  id                    String                 @id @default(cuid())
+  ownerId               String
+  kind                  ListingKind
+  categoryId            String
+  subCategory           String?
+  title                 String
+  description           String
+  status                ListingStatus          @default(draft)
+  country               String                 @default("Kenya")
+  county                String
+  town                  String
+  generalArea           String
+  exactLocation         Unsupported("geography(Point,4326)")
+  publicLocation        Json
+  maxTravelRadiusKm     Decimal?               @db.Decimal(8, 2)
+  countrywideAvailable  Boolean                @default(false)
+  logistics             Json
+  attributes            Json
+  rating                Decimal                @default(0) @db.Decimal(3, 2)
+  reviewCount           Int                    @default(0)
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  owner                 User                   @relation("OwnerListings", fields: [ownerId], references: [id])
+  category              Category               @relation(fields: [categoryId], references: [id])
+  media                 ListingMedia[]
+  modeRules             ListingOperationMode[]
+  bookings              Booking[]
+  chatThreads           ChatThread[]
+  savedSearches         SavedSearch[]
+
+  @@index([categoryId, county, status])
+  @@index([countrywideAvailable, status])
+}
+
+model ListingMedia {
+  id        String   @id @default(cuid())
+  listingId String
+  url       String
+  alt       String
+  isPrimary Boolean  @default(false)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  listing   Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@index([listingId, isPrimary])
+}
+
+model ListingOperationMode {
+  id               String        @id @default(cuid())
+  listingId        String
+  mode             OperationMode
+  label            String
+  billingMetric    String
+  rateKes          Decimal       @db.Decimal(12, 2)
+  minimumUnits     Int           @default(1)
+  requiresKyc      Boolean       @default(true)
+  requiresDeposit  Boolean       @default(false)
+  depositKes       Decimal?      @db.Decimal(12, 2)
+  replacementKes   Decimal?      @db.Decimal(12, 2)
+  platformFeeRate  Decimal       @default(0.08) @db.Decimal(5, 4)
+  listing          Listing       @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@unique([listingId, mode])
+}
+
+model Booking {
+  id          String        @id @default(cuid())
+  listingId   String
+  renterId    String
+  contractId  String?       @unique
+  mode        OperationMode
+  startAt     DateTime
+  endAt       DateTime
+  status      BookingStatus @default(proposal)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  listing     Listing       @relation(fields: [listingId], references: [id])
+  contract    Contract?     @relation(fields: [contractId], references: [id])
+
+  @@index([listingId, startAt, endAt, status])
+}
+
+model ChatThread {
+  id        String        @id @default(cuid())
+  listingId String
+  renterId  String
+  ownerId   String
+  createdAt DateTime      @default(now())
+  listing   Listing       @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  renter    User          @relation("RenterThreads", fields: [renterId], references: [id])
+  owner     User          @relation("OwnerThreads", fields: [ownerId], references: [id])
+  messages  ChatMessage[]
+  contracts Contract[]
+
+  @@unique([listingId, renterId, ownerId])
+  @@index([renterId, createdAt])
+  @@index([ownerId, createdAt])
+}
+
+model ChatMessage {
+  id        String      @id @default(cuid())
+  threadId  String
+  senderId  String
+  type      MessageType @default(text)
+  text      String?
+  payload   Json?
+  isRead    Boolean     @default(false)
+  createdAt DateTime    @default(now())
+  thread    ChatThread  @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  sender    User        @relation(fields: [senderId], references: [id])
+
+  @@index([threadId, createdAt])
+}
+
+model Contract {
+  id                 String              @id @default(cuid())
+  threadId           String
+  listingId          String
+  bookingId          String?
+  mode               OperationMode
+  status             ContractStatus      @default(draft)
+  termsVersion       String              @default("ke-v1")
+  payloadFingerprint String
+  payload            Json
+  voidedByContractId String?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  thread             ChatThread          @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  booking            Booking?
+  signatures         ContractSignature[]
+  ledgerEntries      PaymentLedgerEntry[]
+  disputes           Dispute[]
+
+  @@index([threadId, status])
+}
+
+model ContractSignature {
+  id          String   @id @default(cuid())
+  contractId  String
+  userId      String
+  role        String
+  printedName String
+  ipAddress   String
+  userAgent   String
+  signedAt    DateTime @default(now())
+  contract    Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id])
+
+  @@unique([contractId, userId])
+}
+
+model PaymentLedgerEntry {
+  id                String            @id @default(cuid())
+  contractId        String
+  userId            String
+  type              LedgerEntryType
+  status            LedgerEntryStatus @default(pending)
+  amountKes         Decimal           @db.Decimal(12, 2)
+  provider          String            @default("paystack")
+  providerReference String?
+  metadata          Json?
+  createdAt         DateTime          @default(now())
+  contract          Contract          @relation(fields: [contractId], references: [id])
+  user              User              @relation(fields: [userId], references: [id])
+
+  @@index([contractId, type, status])
+  @@index([providerReference])
+}
+
+model Dispute {
+  id          String        @id @default(cuid())
+  contractId  String
+  openedById  String
+  status      DisputeStatus @default(open)
+  reason      String
+  evidence    Json
+  resolution  Json?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  contract    Contract      @relation(fields: [contractId], references: [id])
+
+  @@index([contractId, status])
+}
+
+model SavedSearch {
+  id        String   @id @default(cuid())
+  userId    String
+  listingId String?
+  filters   Json
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  listing   Listing? @relation(fields: [listingId], references: [id])
+
+  @@index([userId, createdAt])
+}

@@ -1,0 +1,22 @@
+{
+  "name": "rentorbit",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Countrywide Kenyan rental marketplace for goods, services, and personnel.",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "dev": "npm run build --workspace @rentorbit/shared && npm run dev --workspace @rentorbit/web",
+    "dev:web": "npm run build --workspace @rentorbit/shared && npm run dev --workspace @rentorbit/web",
+    "dev:api": "npm run build --workspace @rentorbit/shared && npm run start:dev --workspace @rentorbit/api",
+    "lint": "npm run lint --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
