@@ -2,7 +2,7 @@
 
 import { ArrowLeft, ArrowRight, BadgeCheck, Camera, Drill, Headphones, LogIn, Search, Sparkles, UserPlus } from "lucide-react";
 import Link from "next/link";
-import { useRef } from "react";
+import { useState } from "react";
 
 type OfferingKey = "goods" | "personnel" | "services";
 
@@ -290,9 +290,9 @@ export function HomeLanding() {
         </div>
       </section>
 
-      <section id="offerings" className="px-4 py-8 sm:px-8 lg:py-12">
-        <div className="mx-auto max-w-[1600px]">
-          <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+      <section id="offerings" className="flex min-h-[70svh] px-3 py-4 sm:px-5 lg:px-6 lg:py-6">
+        <div className="flex min-h-[calc(70svh-2rem)] w-full flex-col sm:min-h-[calc(70svh-2.5rem)] lg:min-h-[calc(70svh-3rem)]">
+          <div className="mb-4 flex shrink-0 flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <p className="text-sm font-black uppercase text-orbit-green">Browse the orbit</p>
               <h2 className="mt-2 text-3xl font-black sm:text-5xl">Choose an offering</h2>
@@ -306,7 +306,7 @@ export function HomeLanding() {
             </Link>
           </div>
 
-          <div className="mx-auto grid w-full gap-5 lg:w-4/5 xl:grid-cols-3">
+          <div className="grid min-h-0 flex-1 w-full gap-4 xl:grid-cols-3">
             {offerings.map((offering) => (
               <OfferingPhone key={offering.key} offering={offering} />
             ))}
@@ -318,17 +318,21 @@ export function HomeLanding() {
 }
 
 function OfferingPhone({ offering }: { offering: Offering }) {
-  const scrollerRef = useRef<HTMLDivElement | null>(null);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const stackListings = [0, 1, 2].map((offset) => offering.listings[(activeIndex + offset) % offering.listings.length]);
 
   function scrollByCard(direction: "left" | "right") {
-    scrollerRef.current?.scrollBy({
-      left: direction === "left" ? -260 : 260,
-      behavior: "smooth"
+    setActiveIndex((current) => {
+      if (direction === "left") {
+        return current === 0 ? offering.listings.length - 1 : current - 1;
+      }
+
+      return (current + 1) % offering.listings.length;
     });
   }
 
   return (
-    <article className="group relative h-[80svh] min-h-[640px] overflow-hidden rounded-[34px] bg-transparent shadow-[0_2px_12px_rgba(25,32,29,0.24)] transition duration-300 hover:translate-y-3">
+    <article className="group relative h-[80svh] min-h-[640px] overflow-hidden rounded-[34px] bg-transparent shadow-[0_2px_12px_rgba(25,32,29,0.24)] xl:h-full xl:min-h-0">
       <div className="relative h-full overflow-hidden rounded-[34px] bg-neutral-200">
         <img src={offering.image} alt={`${offering.title} rentals`} className="absolute inset-0 h-full w-full object-cover" />
         <div className="absolute inset-0 bg-black/25 transition duration-300 group-hover:bg-black/45" />
@@ -347,36 +351,28 @@ function OfferingPhone({ offering }: { offering: Offering }) {
           </Link>
         </div>
 
-        <div className="absolute inset-x-4 bottom-4 translate-y-[70%] rounded-[30px] bg-white/88 p-3 opacity-0 shadow-panel backdrop-blur-xl transition duration-300 group-hover:translate-y-0 group-hover:opacity-100">
-          <div
-            ref={scrollerRef}
-            className="scrollbar-thin flex snap-x gap-3 overflow-x-auto pb-3"
-            aria-label={`${offering.title} sample listings`}
-          >
-            {offering.listings.slice(0, 10).map((listing) => (
-              <ListingPreview key={listing.title} listing={listing} />
-            ))}
-            <Link
-              href={`/marketplace?offering=${offering.key}`}
-              className="flex h-56 w-44 shrink-0 snap-start flex-col items-center justify-center rounded-[24px] border border-dashed border-orbit-line bg-white px-4 text-center text-sm font-black text-orbit-green"
-            >
-              View more
-              <ArrowRight className="mt-3 h-5 w-5" aria-hidden="true" />
-            </Link>
-          </div>
+        <div
+          className="absolute left-1/2 top-[18%] z-20 h-[70%] w-[min(82%,360px)] -translate-x-1/2 opacity-0 transition duration-300 group-hover:opacity-100"
+          aria-label={`${offering.title} sample listings`}
+        >
+          {stackListings.map((listing, index) =>
+            listing ? <StackedListingPreview key={`${listing.title}-${index}`} listing={listing} index={index} /> : null
+          )}
+        </div>
 
-          <div className="flex min-h-14 items-center justify-between rounded-[24px] bg-white px-3">
+        <div className="absolute inset-x-4 bottom-4 z-30 translate-y-5 opacity-0 transition duration-300 group-hover:translate-y-0 group-hover:opacity-100">
+          <div className="flex h-[75px] items-center justify-between rounded-full bg-[#e8e6e3]/85 p-[3px] backdrop-blur-md">
             <button
               onClick={() => scrollByCard("left")}
-              className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-orbit-field text-orbit-ink"
+              className="inline-flex h-full aspect-square shrink-0 items-center justify-center rounded-full bg-[#f7f6f3] p-[0.5%] text-orbit-ink"
               title="Slide left"
             >
               <ArrowLeft className="h-5 w-5" aria-hidden="true" />
             </button>
-            <span className="text-sm font-semibold text-orbit-ink">Slide left and right</span>
+            <span className="text-[18px] font-semibold text-orbit-ink">Slide left and right</span>
             <button
               onClick={() => scrollByCard("right")}
-              className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-black text-white"
+              className="inline-flex h-full aspect-square shrink-0 items-center justify-center rounded-full bg-black p-[0.5%] text-white"
               title="Slide right"
             >
               <ArrowRight className="h-5 w-5" aria-hidden="true" />
@@ -388,15 +384,28 @@ function OfferingPhone({ offering }: { offering: Offering }) {
   );
 }
 
-function ListingPreview({ listing }: { listing: ListingCard }) {
+function StackedListingPreview({ listing, index }: { listing: ListingCard; index: number }) {
+  const layers = [
+    "inset-x-0 top-0 z-30 h-[78%] opacity-100",
+    "inset-x-[7%] top-[12%] z-20 h-[72%] opacity-[0.88]",
+    "inset-x-[14%] top-[24%] z-10 h-[66%] opacity-75"
+  ];
+
   return (
-    <div className="h-56 w-44 shrink-0 snap-start overflow-hidden rounded-[24px] bg-white shadow-panel">
-      <img src={listing.image} alt={listing.title} className="h-28 w-full object-cover" />
-      <div className="grid gap-2 p-3">
-        <h4 className="line-clamp-2 min-h-10 text-sm font-black text-orbit-ink">{listing.title}</h4>
-        <p className="truncate text-xs font-semibold text-neutral-500">{listing.area}</p>
-        <p className="truncate text-sm font-black text-orbit-green">{listing.price}</p>
+    <Link
+      href={`/marketplace?listing=${encodeURIComponent(listing.title)}`}
+      className={`absolute overflow-hidden rounded-[30px] bg-white text-left shadow-[0_18px_45px_rgba(0,0,0,0.2)] transition duration-300 ${layers[index]}`}
+      style={{ transform: `scale(${1 - index * 0.06})` }}
+    >
+      <img src={listing.image} alt={listing.title} className="h-[62%] w-full object-cover" />
+      <div className="grid gap-2 p-4">
+        <div className="flex items-center justify-between gap-2">
+          <span className="truncate text-2xl font-black text-orbit-ink">{listing.price.replace("KES ", "")}</span>
+          <span className="rounded-full bg-[#f7f6f3] px-3 py-2 text-xs font-black text-orbit-amber">4.9</span>
+        </div>
+        <h4 className="line-clamp-2 text-base font-black text-orbit-ink">{listing.title}</h4>
+        <p className="truncate text-sm font-semibold text-neutral-500">{listing.area}</p>
       </div>
-    </div>
+    </Link>
   );
 }
