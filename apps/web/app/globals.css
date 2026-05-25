@@ -117,6 +117,40 @@ textarea:focus-visible {
   background-color: rgb(var(--color-orbit-panel));
 }
 
+.landing-shell {
+  background: #f9f6f1;
+}
+
+.landing-footer {
+  border-top: 1px solid rgb(var(--color-orbit-ink) / 0.1);
+}
+
+.deal-stack-card {
+  background: rgb(196 196 196 / 0.76);
+  border: 0;
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+:root[data-theme="dark"] .landing-shell {
+  background: #403301;
+}
+
+:root[data-theme="dark"] .landing-shell .text-orbit-ink\/65,
+:root[data-theme="dark"] .landing-shell .text-orbit-ink\/68,
+:root[data-theme="dark"] .landing-shell .text-neutral-500,
+:root[data-theme="dark"] .landing-shell .text-neutral-600 {
+  color: #d0d0c8;
+}
+
+:root[data-theme="dark"] .landing-footer {
+  border-top-color: rgb(var(--color-orbit-ink) / 0.16);
+}
+
+:root[data-theme="dark"] .deal-stack-card {
+  background: rgb(80 65 65 / 0.78);
+}
+
 .floating-chat-window {
   width: var(--chat-window-width);
   max-width: calc(100vw - 24px);

@@ -7,11 +7,12 @@ type ThemeMode = "light" | "dark" | "system";
 
 const themeKey = "rentorbit:theme-mode";
 
-const modes: Array<{ mode: ThemeMode; label: string; icon: React.ReactNode }> = [
-  { mode: "light", label: "Light", icon: <Sun className="h-4 w-4" aria-hidden="true" /> },
-  { mode: "dark", label: "Dark", icon: <Moon className="h-4 w-4" aria-hidden="true" /> },
-  { mode: "system", label: "System", icon: <Monitor className="h-4 w-4" aria-hidden="true" /> }
-];
+const modeOrder: ThemeMode[] = ["light", "dark", "system"];
+const modeDetails: Record<ThemeMode, { mode: ThemeMode; label: string; icon: React.ReactNode }> = {
+  light: { mode: "light", label: "Light", icon: <Sun className="h-4 w-4" aria-hidden="true" /> },
+  dark: { mode: "dark", label: "Dark", icon: <Moon className="h-4 w-4" aria-hidden="true" /> },
+  system: { mode: "system", label: "System", icon: <Monitor className="h-4 w-4" aria-hidden="true" /> }
+};
 
 function getSystemTheme() {
   if (typeof window === "undefined") {
@@ -28,8 +29,9 @@ function applyTheme(mode: ThemeMode) {
   document.querySelector('meta[name="theme-color"]')?.setAttribute("content", resolved === "dark" ? "#1A1A1A" : "#F3F6FB");
 }
 
-export function ThemeSwitcher({ compact = false }: { compact?: boolean }) {
+export function ThemeSwitcher({ compact: _compact = false }: { compact?: boolean }) {
   const [mode, setMode] = useState<ThemeMode>("system");
+  const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
     const savedMode = window.localStorage.getItem(themeKey);
@@ -55,33 +57,57 @@ export function ThemeSwitcher({ compact = false }: { compact?: boolean }) {
     setMode(nextMode);
     window.localStorage.setItem(themeKey, nextMode);
     applyTheme(nextMode);
+    setExpanded(false);
   }
+
+  const activeMode = modeDetails[mode];
+  const inactiveModes = modeOrder.filter((item) => item !== activeMode.mode).map((item) => modeDetails[item]);
+  const expandedClass = expanded ? "w-[132px]" : "w-11";
+  const optionsClass = expanded ? "max-w-[84px] opacity-100" : "max-w-0 opacity-0";
 
   return (
     <div
-      className="inline-flex min-h-11 items-center rounded-full border border-orbit-line bg-orbit-panel/90 p-1 text-orbit-ink shadow-panel backdrop-blur"
+      className={`inline-flex h-11 ${expandedClass} items-center overflow-hidden rounded-full border border-orbit-line bg-orbit-panel/90 p-[3px] text-orbit-ink shadow-panel backdrop-blur transition-[width] duration-300 ease-out`}
       role="group"
       aria-label="Theme mode"
+      onMouseEnter={() => setExpanded(true)}
+      onMouseLeave={() => setExpanded(false)}
+      onFocus={() => setExpanded(true)}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) {
+          setExpanded(false);
+        }
+      }}
     >
-      {modes.map((item) => {
-        const active = mode === item.mode;
+      <div className="flex items-center gap-1">
+        <button
+          type="button"
+          onClick={() => selectMode(activeMode.mode)}
+          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-orbit-sky text-orbit-field transition-colors focus-visible:outline-none"
+          aria-pressed="true"
+          title={`${activeMode.label} mode`}
+          aria-label={`${activeMode.label} mode selected`}
+        >
+          {activeMode.icon}
+        </button>
 
-        return (
-          <button
-            key={item.mode}
-            type="button"
-            onClick={() => selectMode(item.mode)}
-            className={`inline-flex min-h-9 items-center justify-center gap-1.5 rounded-full px-3 text-xs font-black transition-colors focus-visible:outline-none ${
-              active ? "bg-orbit-sky text-orbit-field" : "text-orbit-ink hover:bg-orbit-soft/70"
-            } ${compact ? "sm:px-3" : ""}`}
-            aria-pressed={active}
-            title={`${item.label} mode`}
-          >
-            {item.icon}
-            <span className={compact ? "hidden sm:inline" : ""}>{item.label}</span>
-          </button>
-        );
-      })}
+        <div className={`flex ${optionsClass} items-center gap-1 overflow-hidden transition-[max-width,opacity] duration-300 ease-out`}>
+          {inactiveModes.map((item) => (
+            <button
+              key={item.mode}
+              type="button"
+              onClick={() => selectMode(item.mode)}
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-orbit-ink transition-colors hover:bg-orbit-soft/70 focus-visible:outline-none"
+              aria-pressed={false}
+              title={`${item.label} mode`}
+              aria-label={`Switch to ${item.label} mode`}
+              tabIndex={expanded ? 0 : -1}
+            >
+              {item.icon}
+            </button>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

@@ -1,11 +1,11 @@
 "use client";
 
 import type { AccountDashboardProps } from "@/components/AccountDashboard";
+import { CustomSelect, type CustomSelectOption } from "@/components/CustomSelect";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import {
   AlertCircle,
   CheckCircle2,
-  ChevronDown,
   CircleUserRound,
   Eye,
   EyeOff,
@@ -56,8 +56,9 @@ const sessionKey = "rentorbit:account-session";
 const accountsKey = "rentorbit:accounts";
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 const idTypes: IdType[] = ["National ID", "Passport number", "Alien ID"];
+const idTypeOptions: CustomSelectOption[] = idTypes.map((option) => ({ value: option, label: option }));
 const formRailClass =
-  "flex h-[75px] items-center gap-3 rounded-full border border-orbit-line bg-orbit-soft/85 p-[3px] shadow-[inset_0_0_0_1px_rgb(255_255_255_/_0.35)] backdrop-blur-md transition focus-within:border-orbit-green focus-within:ring-2 focus-within:ring-orbit-green/35";
+  "flex h-[75px] items-center gap-3 rounded-full border border-orbit-line bg-orbit-soft/85 p-[3px] shadow-[inset_0_0_0_1px_rgb(255_255_255_/_0.35)] backdrop-blur-md transition focus-within:border-orbit-line focus-within:outline-none focus-within:ring-0";
 const formIconClass = "flex h-full aspect-square shrink-0 items-center justify-center rounded-full bg-orbit-panel text-orbit-green";
 const formInputClass =
   "min-w-0 flex-1 bg-transparent px-1 text-base font-semibold text-orbit-ink outline-none placeholder:text-orbit-ink/45 focus-visible:outline-none";
@@ -472,28 +473,17 @@ export function AccountShell({ initialMode }: { initialMode: AccountMode }) {
                 </label>
               </div>
 
-              <label className="block">
-                <span className="mb-2 block px-3 text-xs font-black uppercase text-orbit-ink/55">ID type</span>
-                <div className={formRailClass}>
-                  <span className={formIconClass}>
-                    <IdCard className="h-5 w-5" aria-hidden="true" />
-                  </span>
-                  <select
-                    value={idType}
-                    onChange={(event) => setIdType(event.target.value as IdType)}
-                    className={`${formInputClass} appearance-none`}
-                  >
-                    {idTypes.map((option) => (
-                      <option key={option} value={option}>
-                        {option}
-                      </option>
-                    ))}
-                  </select>
-                  <span className="mr-3 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-orbit-panel/75 text-orbit-ink">
-                    <ChevronDown className="h-4 w-4" aria-hidden="true" />
-                  </span>
-                </div>
-              </label>
+              <CustomSelect
+                label="ID type"
+                value={idType}
+                options={idTypeOptions}
+                onChange={(value) => setIdType(value as IdType)}
+                labelClassName="mb-2 block px-3 text-xs font-black uppercase text-orbit-ink/55"
+                buttonClassName={`${formRailClass} w-full text-left`}
+                leadingIcon={<IdCard className="h-5 w-5" aria-hidden="true" />}
+                leadingIconClassName={formIconClass}
+                arrowClassName="mr-3 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-orbit-panel/75 text-orbit-ink"
+              />
 
               <label className="block">
                 <span className="mb-2 block px-3 text-xs font-black uppercase text-orbit-ink/55">ID number</span>
