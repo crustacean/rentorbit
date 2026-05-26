@@ -131,6 +131,61 @@ function listingIcon(kind: ResourceListing["kind"]) {
   return <PackageCheck className="h-4 w-4" aria-hidden="true" />;
 }
 
+function listingKindLabel(kind: ResourceListing["kind"]) {
+  if (kind === "good") return "Goods";
+  if (kind === "service") return "Services";
+  return "Personnel";
+}
+
+function positiveInteger(value: string | number, fallback = 1): number {
+  const parsed = typeof value === "number" ? value : Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback;
+}
+
+function bookedUnitsLabel(bookedCount: number, totalCount: number): string {
+  const total = Math.max(1, Math.floor(totalCount));
+  const booked = Math.min(total, Math.max(0, Math.floor(bookedCount)));
+  return `${booked}:${total} BOOKED`;
+}
+
+const seededInventoryTotals: Record<string, number> = {
+  lst_events_tent_nairobi_005: 8,
+  lst_events_chairs_kiambu_006: 120,
+  lst_electronics_camera_nairobi_007: 3,
+  lst_electronics_drone_nakuru_008: 2,
+  lst_vehicle_moving_truck_mombasa_009: 4,
+  lst_vehicle_delivery_bike_kisumu_010: 9,
+  lst_spaces_meeting_room_nairobi_015: 6,
+  lst_spaces_storage_yard_machakos_016: 12,
+  lst_sports_bikes_nyeri_017: 10,
+  lst_sports_camping_nakuru_018: 8,
+  lst_electronics_laptops_nairobi_028: 10,
+  lst_events_lighting_kisumu_029: 5,
+  lst_home_baby_seats_kiambu_032: 7,
+  lst_spaces_kiosk_mombasa_033: 6,
+  lst_events_sound_nairobi_001: 2,
+  lst_tools_generator_kisumu_002: 2,
+  lst_personnel_loader_mombasa_003: 4,
+  lst_space_studio_nakuru_004: 3
+};
+
+const seededBookedUnits: Record<string, number> = {
+  lst_electronics_camera_nairobi_007: 1,
+  lst_tools_generator_kisumu_002: 1,
+  lst_personnel_loader_mombasa_003: 1,
+  lst_spaces_meeting_room_nairobi_015: 2,
+  lst_events_chairs_kiambu_006: 12
+};
+
+function listingInventoryTotal(listing: ResourceListing): number {
+  const metadataTotal = listing.metadata.inventoryTotal;
+  if (typeof metadataTotal === "number" && metadataTotal > 0) {
+    return Math.floor(metadataTotal);
+  }
+
+  return seededInventoryTotals[listing.id] ?? 1;
+}
+
 function readMarketplaceThreads(): AccountChatThread[] {
   if (typeof window === "undefined") {
     return [];
@@ -267,6 +322,8 @@ export function MarketplaceExperience() {
   const [focusedDraft, setFocusedDraft] = useState("");
   const [focusedThread, setFocusedThread] = useState<AccountChatThread | null>(null);
   const [savedListingIds, setSavedListingIds] = useState<string[]>([]);
+  const [bookingQuantity, setBookingQuantity] = useState("1");
+  const [bookedUnitCounts] = useState<Record<string, number>>(seededBookedUnits);
 
   useEffect(registerServiceWorker, []);
 
@@ -398,6 +455,12 @@ export function MarketplaceExperience() {
     start: filters.start,
     end: filters.end
   });
+  const selectedTotalUnits = listingInventoryTotal(selectedListing);
+  const selectedBookedUnits = Math.min(selectedTotalUnits, bookedUnitCounts[selectedListing.id] ?? 0);
+  const selectedAvailableUnits = Math.max(0, selectedTotalUnits - selectedBookedUnits);
+  const selectedQuantity = selectedAvailableUnits > 0
+    ? Math.min(positiveInteger(bookingQuantity, 1), selectedAvailableUnits)
+    : 0;
   const focusedListing = focusedListingId
     ? seededListings.find((listing) => listing.id === focusedListingId) ?? selectedListing
     : null;
@@ -416,6 +479,12 @@ export function MarketplaceExperience() {
     : undefined;
   const focusedGallery = focusedListing ? focusedGalleryForListing(focusedListing) : [];
   const focusedImage = focusedGallery[focusedImageIndex] ?? focusedGallery[0];
+  const focusedTotalUnits = focusedListing ? listingInventoryTotal(focusedListing) : selectedTotalUnits;
+  const focusedBookedUnits = focusedListing ? Math.min(focusedTotalUnits, bookedUnitCounts[focusedListing.id] ?? 0) : selectedBookedUnits;
+  const focusedAvailableUnits = Math.max(0, focusedTotalUnits - focusedBookedUnits);
+  const focusedQuantity = focusedAvailableUnits > 0
+    ? Math.min(positiveInteger(bookingQuantity, 1), focusedAvailableUnits)
+    : 0;
 
   function patchFilters(next: Partial<FilterState>) {
     setFilters((current) => ({ ...current, ...next }));
@@ -424,6 +493,7 @@ export function MarketplaceExperience() {
   function selectListing(listing: ResourceListing) {
     setSelectedId(listing.id);
     setSelectedMode(listing.modeRules[0]?.mode ?? "self_operated");
+    setBookingQuantity("1");
     setContract(null);
   }
 
@@ -435,6 +505,7 @@ export function MarketplaceExperience() {
     setFocusedPanel("details");
     setFocusedDraft("");
     setFocusedThread(null);
+    setBookingQuantity("1");
   }
 
   function focusDmForListing(listing: ResourceListing) {
@@ -466,6 +537,11 @@ export function MarketplaceExperience() {
   }
 
   function proposeBooking() {
+    const proposalQuantity = focusedListing ? focusedQuantity : selectedQuantity;
+    if (proposalQuantity <= 0) {
+      return;
+    }
+
     const nextContract = createContractSummary({
       id: `ctr_preview_${Date.now()}`,
       threadId: `thr_${selectedListing.id}_usr_renter_brian`,
@@ -493,7 +569,7 @@ export function MarketplaceExperience() {
       {
         id: `msg_${Date.now()}`,
         from: "system",
-        text: `Proposal created for ${readableMode(activeMode)}: ${kes(nextContract.quote.totalDueNow.amount)} due now.`
+        text: `Proposal created for ${proposalQuantity} item(s), ${readableMode(activeMode)}: ${kes(nextContract.quote.totalDueNow.amount * proposalQuantity)} due now.`
       }
     ]);
 
@@ -501,7 +577,7 @@ export function MarketplaceExperience() {
       const thread = upsertMarketplaceThread(focusedListing, {
         id: `marketplace-proposal-${Date.now()}`,
         author: "system",
-        text: `Proposal created for ${readableMode(focusedMode)}: ${kes(focusedQuote.totalDueNow.amount)} due now.`,
+        text: `Proposal created for ${proposalQuantity} item(s), ${readableMode(focusedMode)}: ${kes(focusedQuote.totalDueNow.amount * proposalQuantity)} due now.`,
         time: "Now"
       });
       setFocusedThread(thread);
@@ -509,7 +585,7 @@ export function MarketplaceExperience() {
   }
 
   return (
-    <main className="min-h-screen bg-orbit-field">
+    <main className="min-h-screen overflow-x-hidden bg-orbit-field">
       <header className="theme-body-border border-b border-white/70 bg-orbit-panel/90">
         <div className="flex w-full items-center justify-between gap-3 px-4 py-4">
           <Link href="/" className="flex min-w-0 items-center gap-3" aria-label="RentOrbit home">
@@ -549,6 +625,12 @@ export function MarketplaceExperience() {
               selectedPublicCoordinates={selectedPublicCoordinates}
               activeMode={activeMode}
               quote={quote}
+              bookingQuantity={bookingQuantity}
+              setBookingQuantity={setBookingQuantity}
+              selectedQuantity={selectedQuantity}
+              totalUnits={selectedTotalUnits}
+              bookedUnits={selectedBookedUnits}
+              availableUnits={selectedAvailableUnits}
               setSelectedMode={setSelectedMode}
               setChatLines={setChatLines}
               proposeBooking={proposeBooking}
@@ -557,8 +639,8 @@ export function MarketplaceExperience() {
         </MobilePanelOverlay>
       ) : null}
 
-      <div className="grid min-h-[calc(100svh-81px)] w-full gap-3 px-3 py-3 xl:h-[calc(100svh-81px)] xl:overflow-hidden xl:grid-cols-[280px_minmax(0,1fr)_360px] 2xl:grid-cols-[300px_minmax(0,1fr)_380px]">
-        <aside className="hidden h-fit self-start xl:sticky xl:top-0 xl:block xl:max-h-full xl:overflow-visible">
+      <div className="grid min-h-[calc(100svh-81px)] min-w-0 w-full gap-3 px-3 py-3 xl:h-[calc(100svh-81px)] xl:overflow-hidden xl:grid-cols-[280px_minmax(0,1fr)_360px] 2xl:grid-cols-[300px_minmax(0,1fr)_380px]">
+        <aside className="hidden min-w-0 h-fit self-start xl:sticky xl:top-0 xl:block xl:max-h-full xl:overflow-x-hidden xl:overflow-y-visible">
           <DiscoveryPanel filters={filters} patchFilters={patchFilters} />
         </aside>
 
@@ -584,12 +666,18 @@ export function MarketplaceExperience() {
           </div>
         </section>
 
-        <aside className="hidden h-fit self-start xl:sticky xl:top-0 xl:block xl:max-h-full xl:overflow-visible">
+        <aside className="hidden min-w-0 h-fit self-start xl:sticky xl:top-0 xl:block xl:max-h-full xl:overflow-x-hidden xl:overflow-y-visible">
           <ListingDetailsPanel
             selectedListing={selectedListing}
             selectedPublicCoordinates={selectedPublicCoordinates}
             activeMode={activeMode}
             quote={quote}
+            bookingQuantity={bookingQuantity}
+            setBookingQuantity={setBookingQuantity}
+            selectedQuantity={selectedQuantity}
+            totalUnits={selectedTotalUnits}
+            bookedUnits={selectedBookedUnits}
+            availableUnits={selectedAvailableUnits}
             setSelectedMode={setSelectedMode}
             setChatLines={setChatLines}
             proposeBooking={proposeBooking}
@@ -608,6 +696,12 @@ export function MarketplaceExperience() {
           setZoom={setFocusedZoom}
           activeMode={focusedMode}
           quote={focusedQuote}
+          bookingQuantity={bookingQuantity}
+          setBookingQuantity={setBookingQuantity}
+          selectedQuantity={focusedQuantity}
+          totalUnits={focusedTotalUnits}
+          bookedUnits={focusedBookedUnits}
+          availableUnits={focusedAvailableUnits}
           publicCoordinates={focusedPublicCoordinates}
           setSelectedMode={setSelectedMode}
           panel={focusedPanel}
@@ -697,7 +791,7 @@ function DiscoveryPanel({
   patchFilters: (next: Partial<FilterState>) => void;
 }) {
   return (
-    <section className="theme-body-border max-h-full overflow-auto rounded-[36px] bg-orbit-panel/92 p-4 shadow-[0_14px_36px_rgba(25,32,29,0.08)] ring-1 ring-white/70">
+    <section className="theme-body-border m-[2px] max-h-full min-w-0 overflow-y-auto overflow-x-hidden rounded-[36px] bg-orbit-panel/92 p-5 ring-1 ring-white/70">
       <div className="mb-4 flex items-center justify-between">
         <h2 className="text-base font-bold">Discovery</h2>
         <button className="rounded-full border border-orbit-line p-2 text-orbit-green" title="Filter listings">
@@ -818,6 +912,12 @@ function ListingDetailsPanel({
   selectedPublicCoordinates,
   activeMode,
   quote,
+  bookingQuantity,
+  setBookingQuantity,
+  selectedQuantity,
+  totalUnits,
+  bookedUnits,
+  availableUnits,
   setSelectedMode,
   setChatLines,
   proposeBooking
@@ -826,12 +926,23 @@ function ListingDetailsPanel({
   selectedPublicCoordinates?: Coordinates;
   activeMode: OperationMode;
   quote: ReturnType<typeof calculateBookingQuote>;
+  bookingQuantity: string;
+  setBookingQuantity: (value: string) => void;
+  selectedQuantity: number;
+  totalUnits: number;
+  bookedUnits: number;
+  availableUnits: number;
   setSelectedMode: (mode: OperationMode) => void;
   setChatLines: React.Dispatch<React.SetStateAction<ChatLine[]>>;
   proposeBooking: () => void;
 }) {
+  const totalRental = quote.rentalFee.amount * selectedQuantity;
+  const totalPlatform = quote.platformFee.amount * selectedQuantity;
+  const totalDeposit = quote.deposit.amount * selectedQuantity;
+  const totalDueNow = quote.totalDueNow.amount * selectedQuantity;
+
   return (
-    <section className="theme-body-border max-h-full overflow-auto rounded-[36px] bg-orbit-panel/92 p-4 shadow-[0_14px_36px_rgba(25,32,29,0.08)] ring-1 ring-white/70">
+    <section className="theme-body-border m-[2px] max-h-full min-w-0 overflow-y-auto overflow-x-hidden rounded-[36px] bg-orbit-panel/92 p-5 ring-1 ring-white/70">
       <img
         src={selectedListing.media[0]?.url}
         alt={selectedListing.media[0]?.alt ?? selectedListing.title}
@@ -842,7 +953,10 @@ function ListingDetailsPanel({
           <div className="flex flex-wrap gap-2 text-xs font-bold">
             <span className="orbit-tag rounded-full bg-orbit-field px-3 py-1">{selectedListing.location.county}</span>
             <span className="orbit-tag rounded-full bg-orbit-field px-3 py-1">{selectedListing.category}</span>
-            <span className="orbit-tag rounded-full bg-orbit-field px-3 py-1">{selectedListing.kind}</span>
+            <span className="kind-tag orbit-tag rounded-full px-3 py-1" data-kind={selectedListing.kind}>
+              {listingKindLabel(selectedListing.kind)}
+            </span>
+            <span className="orbit-tag rounded-full bg-orbit-field px-3 py-1">{bookedUnitsLabel(bookedUnits, totalUnits)}</span>
           </div>
           <h2 className="mt-3 text-xl font-black">{selectedListing.title}</h2>
           <p className="mt-2 text-sm leading-6 text-neutral-600">{selectedListing.description}</p>
@@ -875,33 +989,45 @@ function ListingDetailsPanel({
           </p>
         </div>
 
-        <div className="grid grid-cols-3 gap-2">
-          {selectedListing.modeRules.map((rule) => (
-            <button
-              key={rule.mode}
-              onClick={() => setSelectedMode(rule.mode)}
-              className={`min-h-14 rounded-[18px] border px-2 py-2 text-xs font-bold ${
-                activeMode === rule.mode
-                  ? "border-orbit-green bg-orbit-soft text-orbit-green"
-                  : "border-orbit-line bg-orbit-panel text-orbit-ink"
-              }`}
-              title={rule.label}
-            >
-              {readableMode(rule.mode)}
-            </button>
-          ))}
+        <div className="rounded-[24px] border border-orbit-line bg-orbit-field p-4">
+          <p className="text-xs font-black uppercase text-orbit-ink/55">Booking mode</p>
+          <div className="mt-3 grid min-w-0 grid-cols-3 gap-2">
+            {selectedListing.modeRules.map((rule) => (
+              <button
+                key={rule.mode}
+                onClick={() => setSelectedMode(rule.mode)}
+                className={`min-w-0 min-h-14 rounded-[18px] border px-2 py-2 text-xs font-bold leading-tight ${
+                  activeMode === rule.mode
+                    ? "border-orbit-green bg-orbit-soft text-orbit-green"
+                    : "border-orbit-line bg-orbit-panel text-orbit-ink"
+                }`}
+                title={rule.label}
+              >
+                {readableMode(rule.mode)}
+              </button>
+            ))}
+          </div>
         </div>
 
+        <BookingQuantityControl
+          quantityValue={bookingQuantity}
+          setQuantityValue={setBookingQuantity}
+          selectedQuantity={selectedQuantity}
+          totalUnits={totalUnits}
+          bookedUnits={bookedUnits}
+          availableUnits={availableUnits}
+        />
+
         <div className="grid grid-cols-2 gap-2 border-y border-orbit-line py-3 text-sm">
-          <SummaryLine label="Rental" value={kes(quote.rentalFee.amount)} />
-          <SummaryLine label="Platform" value={kes(quote.platformFee.amount)} />
-          <SummaryLine label="Deposit" value={kes(quote.deposit.amount)} />
-          <SummaryLine label="Due now" value={kes(quote.totalDueNow.amount)} strong />
+          <SummaryLine label="Rental" value={kes(totalRental)} />
+          <SummaryLine label="Platform" value={kes(totalPlatform)} />
+          <SummaryLine label="Deposit" value={kes(totalDeposit)} />
+          <SummaryLine label="Due now" value={kes(totalDueNow)} strong />
         </div>
 
         <div className="grid grid-cols-2 gap-2 text-sm">
           <IconFact icon={<Truck className="h-4 w-4" />} label={selectedListing.logistics.deliveryModes.join(", ")} />
-          <IconFact icon={<CalendarClock className="h-4 w-4" />} label={`${quote.units} billed unit(s)`} />
+          <IconFact icon={<CalendarClock className="h-4 w-4" />} label={`${selectedQuantity} item(s), ${quote.units} billed unit(s)`} />
         </div>
 
         <div className="grid grid-cols-2 gap-2">
@@ -923,7 +1049,8 @@ function ListingDetailsPanel({
           </button>
           <button
             onClick={proposeBooking}
-            className="inline-flex items-center justify-center gap-2 rounded-full bg-orbit-green px-3 py-3 text-sm font-bold text-orbit-field"
+            disabled={availableUnits <= 0}
+            className="inline-flex items-center justify-center gap-2 rounded-full bg-orbit-green px-3 py-3 text-sm font-bold text-orbit-field disabled:cursor-not-allowed disabled:grayscale disabled:opacity-45"
           >
             <FileSignature className="h-4 w-4" aria-hidden="true" />
             Propose
@@ -944,6 +1071,12 @@ function FocusedListingOverlay({
   setZoom,
   activeMode,
   quote,
+  bookingQuantity,
+  setBookingQuantity,
+  selectedQuantity,
+  totalUnits,
+  bookedUnits,
+  availableUnits,
   publicCoordinates,
   setSelectedMode,
   panel,
@@ -965,6 +1098,12 @@ function FocusedListingOverlay({
   setZoom: React.Dispatch<React.SetStateAction<number>>;
   activeMode: OperationMode;
   quote: ReturnType<typeof calculateBookingQuote>;
+  bookingQuantity: string;
+  setBookingQuantity: (value: string) => void;
+  selectedQuantity: number;
+  totalUnits: number;
+  bookedUnits: number;
+  availableUnits: number;
   publicCoordinates?: Coordinates;
   setSelectedMode: (mode: OperationMode) => void;
   panel: FocusedPanel;
@@ -1000,7 +1139,7 @@ function FocusedListingOverlay({
 
   return (
     <div className="fixed inset-0 z-[80] bg-orbit-field p-2 text-orbit-ink sm:p-3" role="dialog" aria-modal="true" aria-label={listing.title}>
-      <div className="grid h-full overflow-hidden rounded-[34px] border-2 border-[#4391F5] bg-orbit-panel shadow-[0_24px_70px_rgba(25,32,29,0.22)] lg:grid-cols-[minmax(0,7fr)_minmax(340px,3fr)]">
+      <div className="grid h-full min-w-0 overflow-hidden rounded-[34px] border-2 border-[#4391F5] bg-orbit-panel shadow-[0_24px_70px_rgba(25,32,29,0.22)] lg:grid-cols-[minmax(0,7fr)_minmax(340px,3fr)]">
         <section className="relative min-h-[55svh] overflow-hidden bg-[#1A1A1A] lg:min-h-0">
           <div className="absolute left-4 top-4 z-20 flex items-center gap-2 rounded-full bg-black/65 p-1 text-white backdrop-blur">
             <button
@@ -1081,13 +1220,19 @@ function FocusedListingOverlay({
           </div>
         </section>
 
-        <aside className="min-h-0 overflow-hidden bg-orbit-panel">
+        <aside className="min-h-0 min-w-0 overflow-hidden bg-orbit-panel">
           {panel === "details" ? (
             <FocusedDetailsPanel
               listing={listing}
               publicCoordinates={publicCoordinates}
               activeMode={activeMode}
               quote={quote}
+              bookingQuantity={bookingQuantity}
+              setBookingQuantity={setBookingQuantity}
+              selectedQuantity={selectedQuantity}
+              totalUnits={totalUnits}
+              bookedUnits={bookedUnits}
+              availableUnits={availableUnits}
               setSelectedMode={setSelectedMode}
               onDm={onDm}
               proposeBooking={proposeBooking}
@@ -1112,6 +1257,12 @@ function FocusedDetailsPanel({
   publicCoordinates,
   activeMode,
   quote,
+  bookingQuantity,
+  setBookingQuantity,
+  selectedQuantity,
+  totalUnits,
+  bookedUnits,
+  availableUnits,
   setSelectedMode,
   onDm,
   proposeBooking
@@ -1120,17 +1271,31 @@ function FocusedDetailsPanel({
   publicCoordinates?: Coordinates;
   activeMode: OperationMode;
   quote: ReturnType<typeof calculateBookingQuote>;
+  bookingQuantity: string;
+  setBookingQuantity: (value: string) => void;
+  selectedQuantity: number;
+  totalUnits: number;
+  bookedUnits: number;
+  availableUnits: number;
   setSelectedMode: (mode: OperationMode) => void;
   onDm: () => void;
   proposeBooking: () => void;
 }) {
+  const totalRental = quote.rentalFee.amount * selectedQuantity;
+  const totalPlatform = quote.platformFee.amount * selectedQuantity;
+  const totalDeposit = quote.deposit.amount * selectedQuantity;
+  const totalDueNow = quote.totalDueNow.amount * selectedQuantity;
+
   return (
-    <section className="grid h-full min-h-0 content-start gap-4 overflow-y-auto p-4">
+    <section className="grid h-full min-h-0 min-w-0 content-start gap-4 overflow-y-auto overflow-x-hidden p-4">
       <div>
         <div className="flex flex-wrap gap-2 text-xs font-bold">
           <span className="orbit-tag rounded-full bg-orbit-field px-3 py-1">{listing.location.county}</span>
           <span className="orbit-tag rounded-full bg-orbit-field px-3 py-1">{listing.category}</span>
-          <span className="orbit-tag rounded-full bg-orbit-field px-3 py-1">{listing.kind}</span>
+          <span className="kind-tag orbit-tag rounded-full px-3 py-1" data-kind={listing.kind}>
+            {listingKindLabel(listing.kind)}
+          </span>
+          <span className="orbit-tag rounded-full bg-orbit-field px-3 py-1">{bookedUnitsLabel(bookedUnits, totalUnits)}</span>
         </div>
         <h2 className="mt-4 text-2xl font-black">{listing.title}</h2>
         <p className="mt-2 text-sm leading-6 text-neutral-600">{listing.description}</p>
@@ -1161,33 +1326,45 @@ function FocusedDetailsPanel({
         </p>
       </div>
 
-      <div className="grid grid-cols-3 gap-2">
-        {listing.modeRules.map((rule) => (
-          <button
-            key={rule.mode}
-            onClick={() => setSelectedMode(rule.mode)}
-            className={`min-h-14 rounded-[18px] border px-2 py-2 text-xs font-bold ${
-              activeMode === rule.mode
-                ? "border-[#4391F5] bg-orbit-soft text-orbit-green"
-                : "border-orbit-line bg-orbit-panel text-orbit-ink"
-            }`}
-            title={rule.label}
-          >
-            {readableMode(rule.mode)}
-          </button>
-        ))}
+      <div className="rounded-[24px] border border-orbit-line bg-orbit-field p-4">
+        <p className="text-xs font-black uppercase text-orbit-ink/55">Booking mode</p>
+        <div className="mt-3 grid min-w-0 grid-cols-3 gap-2">
+          {listing.modeRules.map((rule) => (
+            <button
+              key={rule.mode}
+              onClick={() => setSelectedMode(rule.mode)}
+              className={`min-w-0 min-h-14 rounded-[18px] border px-2 py-2 text-xs font-bold leading-tight ${
+                activeMode === rule.mode
+                  ? "border-[#4391F5] bg-orbit-soft text-orbit-green"
+                  : "border-orbit-line bg-orbit-panel text-orbit-ink"
+              }`}
+              title={rule.label}
+            >
+              {readableMode(rule.mode)}
+            </button>
+          ))}
+        </div>
       </div>
 
+      <BookingQuantityControl
+        quantityValue={bookingQuantity}
+        setQuantityValue={setBookingQuantity}
+        selectedQuantity={selectedQuantity}
+        totalUnits={totalUnits}
+        bookedUnits={bookedUnits}
+        availableUnits={availableUnits}
+      />
+
       <div className="grid grid-cols-2 gap-2 border-y border-orbit-line py-3 text-sm">
-        <SummaryLine label="Rental" value={kes(quote.rentalFee.amount)} />
-        <SummaryLine label="Platform" value={kes(quote.platformFee.amount)} />
-        <SummaryLine label="Deposit" value={kes(quote.deposit.amount)} />
-        <SummaryLine label="Due now" value={kes(quote.totalDueNow.amount)} strong />
+        <SummaryLine label="Rental" value={kes(totalRental)} />
+        <SummaryLine label="Platform" value={kes(totalPlatform)} />
+        <SummaryLine label="Deposit" value={kes(totalDeposit)} />
+        <SummaryLine label="Due now" value={kes(totalDueNow)} strong />
       </div>
 
       <div className="grid grid-cols-2 gap-2 text-sm">
         <IconFact icon={<Truck className="h-4 w-4" />} label={listing.logistics.deliveryModes.join(", ")} />
-        <IconFact icon={<CalendarClock className="h-4 w-4" />} label={`${quote.units} billed unit(s)`} />
+        <IconFact icon={<CalendarClock className="h-4 w-4" />} label={`${selectedQuantity} item(s), ${quote.units} billed unit(s)`} />
       </div>
 
       <div className="grid grid-cols-2 gap-2">
@@ -1200,7 +1377,8 @@ function FocusedDetailsPanel({
         </button>
         <button
           onClick={proposeBooking}
-          className="inline-flex items-center justify-center gap-2 rounded-full bg-orbit-green px-3 py-3 text-sm font-bold text-orbit-field"
+          disabled={availableUnits <= 0}
+          className="inline-flex items-center justify-center gap-2 rounded-full bg-orbit-green px-3 py-3 text-sm font-bold text-orbit-field disabled:cursor-not-allowed disabled:grayscale disabled:opacity-45"
         >
           <FileSignature className="h-4 w-4" aria-hidden="true" />
           Propose
@@ -1354,9 +1532,12 @@ function MarketplaceListingCard({
       <div className="flex min-w-0 flex-col justify-between gap-3 overflow-hidden pr-0 md:pr-3">
         <div>
           <div className="mb-4 flex flex-wrap items-center gap-2">
-            <span className="orbit-tag inline-flex h-[clamp(32px,2.4vw,36px)] items-center gap-2 rounded-full border border-orbit-line bg-orbit-panel px-[clamp(10px,1vw,12px)] text-[clamp(10px,0.8vw,11px)] font-black uppercase tracking-normal text-orbit-ink">
+            <span
+              className="kind-tag orbit-tag inline-flex h-[clamp(32px,2.4vw,36px)] items-center gap-2 rounded-full border px-[clamp(10px,1vw,12px)] text-[clamp(10px,0.8vw,11px)] font-black uppercase tracking-normal"
+              data-kind={listing.kind}
+            >
               {listingIcon(listing.kind)}
-              {listing.kind}
+              {listingKindLabel(listing.kind)}
             </span>
             {unavailable ? (
               <span className="orbit-tag inline-flex h-[clamp(32px,2.4vw,36px)] items-center rounded-full bg-orbit-clay px-[clamp(10px,1vw,12px)] text-[clamp(10px,0.8vw,11px)] font-black uppercase text-orbit-field">Booked</span>
@@ -1432,6 +1613,85 @@ function Metric({ label, value, tone }: { label: string; value: string; tone: "y
     <div className="rounded-[18px] border border-orbit-line bg-orbit-field p-2">
       <p className={`text-lg font-black ${tones[tone]}`}>{value}</p>
       <p className="mt-1 font-semibold text-neutral-600">{label}</p>
+    </div>
+  );
+}
+
+function BookingQuantityControl({
+  quantityValue,
+  setQuantityValue,
+  selectedQuantity,
+  totalUnits,
+  bookedUnits,
+  availableUnits
+}: {
+  quantityValue: string;
+  setQuantityValue: (value: string) => void;
+  selectedQuantity: number;
+  totalUnits: number;
+  bookedUnits: number;
+  availableUnits: number;
+}) {
+  const disabled = availableUnits <= 0;
+
+  function updateQuantity(nextValue: number) {
+    if (availableUnits <= 0) {
+      setQuantityValue("0");
+      return;
+    }
+
+    setQuantityValue(String(Math.min(availableUnits, Math.max(1, Math.floor(nextValue)))));
+  }
+
+  return (
+    <div className="min-w-0 rounded-[24px] border border-orbit-line bg-orbit-field p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-black uppercase text-orbit-ink/55">Booking quantity</p>
+          <p className="mt-1 text-sm font-semibold text-orbit-ink/60">
+            {availableUnits} available • {bookedUnitsLabel(bookedUnits, totalUnits)}
+          </p>
+        </div>
+        <span className="rounded-full bg-orbit-panel px-3 py-2 text-xs font-black text-orbit-green">
+          Max {availableUnits}
+        </span>
+      </div>
+      <div className="mt-3 flex h-14 min-w-0 items-center rounded-full border border-orbit-line bg-orbit-panel p-[3px]">
+        <button
+          type="button"
+          onClick={() => updateQuantity(selectedQuantity - 1)}
+          disabled={disabled || selectedQuantity <= 1}
+          className="flex h-full aspect-square shrink-0 items-center justify-center rounded-full bg-orbit-soft text-lg font-black disabled:cursor-not-allowed disabled:opacity-35"
+          title="Decrease quantity"
+        >
+          -
+        </button>
+        <input
+          value={quantityValue}
+          onChange={(event) => {
+            if (!event.target.value) {
+              setQuantityValue("");
+              return;
+            }
+
+            updateQuantity(positiveInteger(event.target.value, 1));
+          }}
+          onBlur={() => updateQuantity(positiveInteger(quantityValue, 1))}
+          disabled={disabled}
+          type="text"
+          inputMode="numeric"
+          className="h-full min-w-0 flex-1 bg-transparent px-3 text-center text-lg font-black text-orbit-ink outline-none focus:outline-none focus:ring-0 focus-visible:outline-none disabled:opacity-50"
+        />
+        <button
+          type="button"
+          onClick={() => updateQuantity(selectedQuantity + 1)}
+          disabled={disabled || selectedQuantity >= availableUnits}
+          className="flex h-full aspect-square shrink-0 items-center justify-center rounded-full bg-orbit-green text-lg font-black text-orbit-field disabled:cursor-not-allowed disabled:grayscale disabled:opacity-35"
+          title="Increase quantity"
+        >
+          +
+        </button>
+      </div>
     </div>
   );
 }

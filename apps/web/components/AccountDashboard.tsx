@@ -50,6 +50,8 @@ type ListingPhoto = {
   previewUrl: string;
 };
 
+type ListingMobility = "mobile" | "transportable" | "fixed_in_place";
+
 type OwnerListing = {
   id: string;
   title: string;
@@ -59,6 +61,9 @@ type OwnerListing = {
   description: string;
   photos: ListingPhoto[];
   status: string;
+  mobility: ListingMobility;
+  quantity: number;
+  bookedCount: number;
 };
 
 type ChatMessage = {
@@ -195,20 +200,113 @@ function readSavedMarketplaceListings(): SavedMarketplaceListing[] {
 }
 
 function readSavedMarketplaceActivityItems(): ActivityItem[] {
-  return readSavedMarketplaceListings().map((listing) => ({
-    id: `saved-marketplace-${listing.id}`,
-    title: listing.title,
-    description: listing.description || "Saved from the marketplace for follow-up.",
-    status: "Saved",
-    meta: [listing.county, listing.price, listing.kind],
-    actionLabel: "Open",
-    marketplaceListingId: listing.id
-  }));
+  return readSavedMarketplaceListings().map((listing) => {
+    const marketplaceListing = seededListings.find((item) => item.id === listing.id);
+    const totalCount = marketplaceListing ? listingInventoryTotal(marketplaceListing) : 1;
+    const bookedCount = marketplaceListing ? initialBookedUnitsForListingId(marketplaceListing.id) : 0;
+
+    return {
+      id: `saved-marketplace-${listing.id}`,
+      title: listing.title,
+      description: listing.description || "Saved from the marketplace for follow-up.",
+      status: "Saved",
+      meta: [
+        listing.county,
+        listing.price,
+        marketplaceListing ? mobilityLabel(listingMobility(marketplaceListing)) : listing.kind,
+        bookedUnitsLabel(bookedCount, totalCount)
+      ],
+      actionLabel: "Open",
+      marketplaceListingId: listing.id
+    };
+  });
 }
 
 function writeSavedMarketplaceListings(listings: SavedMarketplaceListing[]) {
   window.localStorage.setItem(savedListingsKey, JSON.stringify(listings));
   window.dispatchEvent(new Event(savedListingsUpdatedEvent));
+}
+
+function mobilityLabel(mobility: ListingMobility): string {
+  if (mobility === "mobile") return "Mobile";
+  if (mobility === "fixed_in_place") return "Fixed in place";
+  return "Transportable";
+}
+
+function listingKindLabel(kind: ListingKind): string {
+  if (kind === "good") return "Goods";
+  if (kind === "service") return "Services";
+  return "Personnel";
+}
+
+function kindFromTagText(value: string): ListingKind | null {
+  const normalized = value.toLowerCase();
+  if (normalized === "good" || normalized === "goods") return "good";
+  if (normalized === "service" || normalized === "services") return "service";
+  if (normalized === "personnel") return "personnel";
+  return null;
+}
+
+function bookedUnitsLabel(bookedCount: number, totalCount: number): string {
+  const total = Math.max(1, Math.floor(totalCount));
+  const booked = Math.min(total, Math.max(0, Math.floor(bookedCount)));
+  return `${booked}:${total} BOOKED`;
+}
+
+function positiveInteger(value: string | number, fallback = 1): number {
+  const parsed = typeof value === "number" ? value : Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback;
+}
+
+const seededInventoryTotals: Record<string, number> = {
+  lst_events_tent_nairobi_005: 8,
+  lst_events_chairs_kiambu_006: 120,
+  lst_electronics_camera_nairobi_007: 3,
+  lst_electronics_drone_nakuru_008: 2,
+  lst_vehicle_moving_truck_mombasa_009: 4,
+  lst_vehicle_delivery_bike_kisumu_010: 9,
+  lst_spaces_meeting_room_nairobi_015: 6,
+  lst_spaces_storage_yard_machakos_016: 12,
+  lst_sports_bikes_nyeri_017: 10,
+  lst_sports_camping_nakuru_018: 8,
+  lst_electronics_laptops_nairobi_028: 10,
+  lst_events_lighting_kisumu_029: 5,
+  lst_home_baby_seats_kiambu_032: 7,
+  lst_spaces_kiosk_mombasa_033: 6,
+  lst_events_sound_nairobi_001: 2,
+  lst_tools_generator_kisumu_002: 2,
+  lst_personnel_loader_mombasa_003: 4,
+  lst_space_studio_nakuru_004: 3
+};
+
+function listingInventoryTotal(listing: ResourceListing): number {
+  const metadataTotal = listing.metadata.inventoryTotal;
+  if (typeof metadataTotal === "number" && metadataTotal > 0) {
+    return Math.floor(metadataTotal);
+  }
+
+  return seededInventoryTotals[listing.id] ?? 1;
+}
+
+function initialBookedUnitsForListingId(listingId: string): number {
+  return activeRentalItems.filter((item) => item.marketplaceListingId === listingId).length;
+}
+
+function listingMobility(listing: ResourceListing): ListingMobility {
+  const metadataMobility = listing.metadata.mobility;
+  if (metadataMobility === "mobile" || metadataMobility === "transportable" || metadataMobility === "fixed_in_place") {
+    return metadataMobility;
+  }
+
+  if (listing.kind === "personnel" || listing.logistics.providesOwnTransport || listing.location.maxTravelRadiusKm) {
+    return "mobile";
+  }
+
+  if (listing.logistics.deliveryModes.some((mode) => mode.endsWith("_delivery")) || listing.location.countrywideAvailable) {
+    return "transportable";
+  }
+
+  return "fixed_in_place";
 }
 
 function makePhoto(name: string): ListingPhoto {
@@ -247,7 +345,7 @@ const activeRentalItems: ActivityItem[] = [
     title: "Sony FX3 cinema kit",
     description: "Owner-operated camera kit currently booked for a two-day product shoot.",
     status: "Active now",
-    meta: ["Kilimani", "KES 7,500/day", "Return Tue"],
+    meta: ["Kilimani", "KES 7,500/day", bookedUnitsLabel(1, 3)],
     actionLabel: "Open",
     marketplaceListingId: "lst_electronics_camera_nairobi_007"
   },
@@ -256,7 +354,7 @@ const activeRentalItems: ActivityItem[] = [
     title: "7.5kVA silent generator",
     description: "Site rental with refundable deposit captured and return photos pending.",
     status: "Return review",
-    meta: ["Thika", "KES 6,000/day", "Deposit held"],
+    meta: ["Thika", "KES 6,000/day", bookedUnitsLabel(1, 2)],
     actionLabel: "Open",
     marketplaceListingId: "lst_tools_generator_kisumu_002"
   },
@@ -265,25 +363,25 @@ const activeRentalItems: ActivityItem[] = [
     title: "Verified event setup crew",
     description: "Three-person event crew booked with operator-only delivery terms.",
     status: "In progress",
-    meta: ["Westlands", "KES 12,000", "Ends 6 PM"],
+    meta: ["Westlands", "KES 12,000", bookedUnitsLabel(1, 4)],
     actionLabel: "Open",
     marketplaceListingId: "lst_personnel_loader_mombasa_003"
   }
 ];
 
 const initialOwnerListings: OwnerListing[] = [
-  { id: "owner-pa", title: "JBL PA sound system with stands", description: "Two powered tops, mixer, cables, and setup support.", status: "Available", county: "Nairobi", price: "KES 4,500/day", kind: "good", photos: makePhotos(["jbl-pa-main.jpg", "mixer-cables.jpg"]) },
-  { id: "owner-generator", title: "7.5kVA silent generator", description: "Event and site generator with local delivery.", status: "2 inquiries", county: "Kiambu", price: "KES 6,000/day", kind: "good", photos: makePhotos(["generator-front.jpg", "generator-panel.jpg"]) },
-  { id: "owner-crew", title: "Verified event setup crew", description: "Three-person crew for tents, staging, lights, and teardown.", status: "Available", county: "Nairobi", price: "KES 12,000", kind: "personnel", photos: makePhotos(["crew-setup.jpg", "stage-build.jpg"]) },
-  { id: "owner-podcast", title: "Podcast and product shoot studio", description: "Small studio with lights, microphones, and engineer support.", status: "Booked tomorrow", county: "Kilimani", price: "KES 9,500/day", kind: "service", photos: makePhotos(["studio-wide.jpg", "mic-desk.jpg"]) },
-  { id: "owner-chairs", title: "Chiavari event chairs", description: "Stackable chairs with covers and regional delivery.", status: "Available", county: "Nakuru", price: "KES 120/chair", kind: "good", photos: makePhotos(["chiavari-stack.jpg", "chair-cover.jpg"]) },
-  { id: "owner-tent", title: "Outdoor stretch tent", description: "Weather-rated tent with installation crew.", status: "Quote requested", county: "Machakos", price: "KES 18,000/day", kind: "good", photos: makePhotos(["stretch-tent.jpg", "tent-rigging.jpg"]) },
-  { id: "owner-makeup", title: "Bridal makeup artist", description: "Owner-operated glam package with travel radius.", status: "Available", county: "Mombasa", price: "KES 8,000", kind: "service", photos: makePhotos(["makeup-kit.jpg", "bridal-finish.jpg"]) },
-  { id: "owner-bike", title: "Delivery motorbike rider", description: "Verified rider available for errands and dispatch blocks.", status: "Available", county: "Kisumu", price: "KES 600/hr", kind: "personnel", photos: makePhotos(["rider-bike.jpg", "delivery-box.jpg"]) },
-  { id: "owner-projector", title: "Conference projector kit", description: "Projector, screen, HDMI adapters, and backup cables.", status: "1 inquiry", county: "Eldoret", price: "KES 3,500/day", kind: "good", photos: makePhotos(["projector-kit.jpg", "screen-stand.jpg"]) },
-  { id: "owner-cleaning", title: "Post-event cleaning team", description: "Casual labor team for cleanup and waste handling.", status: "Available", county: "Nairobi", price: "KES 7,000", kind: "personnel", photos: makePhotos(["cleaning-team.jpg", "cleanup-tools.jpg"]) },
-  { id: "owner-drone", title: "Licensed drone operator", description: "Aerial footage service with licensed pilot and editing add-on.", status: "Pending review", county: "Naivasha", price: "KES 15,000", kind: "service", photos: makePhotos(["drone-kit.jpg", "operator-field.jpg"]) },
-  { id: "owner-catering", title: "Mobile catering station", description: "Chafing dishes, service tables, and two attendants.", status: "Available", county: "Mombasa", price: "KES 10,000/day", kind: "service", photos: makePhotos(["catering-station.jpg", "service-table.jpg"]) }
+  { id: "owner-pa", title: "JBL PA sound system with stands", description: "Two powered tops, mixer, cables, and setup support.", status: "Available", county: "Nairobi", price: "KES 4,500/day", kind: "good", mobility: "transportable", quantity: 2, bookedCount: 0, photos: makePhotos(["jbl-pa-main.jpg", "mixer-cables.jpg"]) },
+  { id: "owner-generator", title: "7.5kVA silent generator", description: "Event and site generator with local delivery.", status: "2 inquiries", county: "Kiambu", price: "KES 6,000/day", kind: "good", mobility: "transportable", quantity: 2, bookedCount: 1, photos: makePhotos(["generator-front.jpg", "generator-panel.jpg"]) },
+  { id: "owner-crew", title: "Verified event setup crew", description: "Three-person crew for tents, staging, lights, and teardown.", status: "Available", county: "Nairobi", price: "KES 12,000", kind: "personnel", mobility: "mobile", quantity: 4, bookedCount: 0, photos: makePhotos(["crew-setup.jpg", "stage-build.jpg"]) },
+  { id: "owner-podcast", title: "Podcast and product shoot studio", description: "Small studio with lights, microphones, and engineer support.", status: "Booked tomorrow", county: "Kilimani", price: "KES 9,500/day", kind: "service", mobility: "fixed_in_place", quantity: 3, bookedCount: 1, photos: makePhotos(["studio-wide.jpg", "mic-desk.jpg"]) },
+  { id: "owner-chairs", title: "Chiavari event chairs", description: "Stackable chairs with covers and regional delivery.", status: "Available", county: "Nakuru", price: "KES 120/chair", kind: "good", mobility: "transportable", quantity: 120, bookedCount: 0, photos: makePhotos(["chiavari-stack.jpg", "chair-cover.jpg"]) },
+  { id: "owner-tent", title: "Outdoor stretch tent", description: "Weather-rated tent with installation crew.", status: "Quote requested", county: "Machakos", price: "KES 18,000/day", kind: "good", mobility: "fixed_in_place", quantity: 5, bookedCount: 2, photos: makePhotos(["stretch-tent.jpg", "tent-rigging.jpg"]) },
+  { id: "owner-makeup", title: "Bridal makeup artist", description: "Owner-operated glam package with travel radius.", status: "Available", county: "Mombasa", price: "KES 8,000", kind: "service", mobility: "mobile", quantity: 1, bookedCount: 0, photos: makePhotos(["makeup-kit.jpg", "bridal-finish.jpg"]) },
+  { id: "owner-bike", title: "Delivery motorbike rider", description: "Verified rider available for errands and dispatch blocks.", status: "Available", county: "Kisumu", price: "KES 600/hr", kind: "personnel", mobility: "mobile", quantity: 3, bookedCount: 0, photos: makePhotos(["rider-bike.jpg", "delivery-box.jpg"]) },
+  { id: "owner-projector", title: "Conference projector kit", description: "Projector, screen, HDMI adapters, and backup cables.", status: "1 inquiry", county: "Eldoret", price: "KES 3,500/day", kind: "good", mobility: "transportable", quantity: 4, bookedCount: 1, photos: makePhotos(["projector-kit.jpg", "screen-stand.jpg"]) },
+  { id: "owner-cleaning", title: "Post-event cleaning team", description: "Casual labor team for cleanup and waste handling.", status: "Available", county: "Nairobi", price: "KES 7,000", kind: "personnel", mobility: "mobile", quantity: 6, bookedCount: 0, photos: makePhotos(["cleaning-team.jpg", "cleanup-tools.jpg"]) },
+  { id: "owner-drone", title: "Licensed drone operator", description: "Aerial footage service with licensed pilot and editing add-on.", status: "Pending review", county: "Naivasha", price: "KES 15,000", kind: "service", mobility: "mobile", quantity: 2, bookedCount: 0, photos: makePhotos(["drone-kit.jpg", "operator-field.jpg"]) },
+  { id: "owner-catering", title: "Mobile catering station", description: "Chafing dishes, service tables, and two attendants.", status: "Available", county: "Mombasa", price: "KES 10,000/day", kind: "service", mobility: "transportable", quantity: 3, bookedCount: 0, photos: makePhotos(["catering-station.jpg", "service-table.jpg"]) }
 ];
 
 const savedItemNames = [
@@ -330,17 +428,25 @@ const savedMarketplaceListingIds = [
 
 const savedActivityItems: ActivityItem[] = savedItemNames.map((title, index) => {
   const counties = ["Nairobi", "Kiambu", "Mombasa", "Nakuru", "Kisumu", "Machakos"];
-  const categories = ["Good", "Service", "Personnel"];
   const rates = ["KES 2,500/day", "KES 6,000/day", "KES 900/hr", "Quote ready"];
+  const marketplaceListingId = savedMarketplaceListingIds[index % savedMarketplaceListingIds.length];
+  const marketplaceListing = seededListings.find((listing) => listing.id === marketplaceListingId);
+  const totalCount = marketplaceListing ? listingInventoryTotal(marketplaceListing) : 1;
+  const bookedCount = marketplaceListing ? initialBookedUnitsForListingId(marketplaceListing.id) : 0;
 
   return {
     id: `saved-${index}`,
     title,
     description: "Saved for comparison before sending a proposal or direct message.",
     status: index % 3 === 0 ? "Price watched" : "Saved",
-    meta: [counties[index % counties.length] ?? "Kenya", rates[index % rates.length] ?? "Quote ready", categories[index % categories.length] ?? "Good"],
+    meta: [
+      counties[index % counties.length] ?? "Kenya",
+      rates[index % rates.length] ?? "Quote ready",
+      marketplaceListing ? mobilityLabel(listingMobility(marketplaceListing)) : "Transportable",
+      bookedUnitsLabel(bookedCount, totalCount)
+    ],
     actionLabel: "Open",
-    marketplaceListingId: savedMarketplaceListingIds[index % savedMarketplaceListingIds.length]
+    marketplaceListingId
   };
 });
 
@@ -402,14 +508,19 @@ const initialThreads: ChatThread[] = [
   }
 ];
 
-const panelClass = "theme-body-border rounded-[36px] bg-orbit-panel/92 shadow-[0_14px_36px_rgba(25,32,29,0.08)] ring-1 ring-white/70";
+const panelClass = "theme-body-border rounded-[36px] bg-orbit-panel/92 ring-1 ring-white/70";
 const fieldClass =
   "w-full rounded-[18px] border border-orbit-line bg-orbit-panel px-3 py-2 text-sm font-semibold text-orbit-ink outline-none focus:border-orbit-line focus:outline-none focus:ring-0 focus-visible:outline-none";
 const labelClass = "mb-1 block text-xs font-semibold uppercase text-orbit-ink/55";
 const listingKindOptions: CustomSelectOption[] = [
-  { value: "good", label: "Good" },
-  { value: "service", label: "Service" },
+  { value: "good", label: "Goods" },
+  { value: "service", label: "Services" },
   { value: "personnel", label: "Personnel" }
+];
+const listingMobilityOptions: CustomSelectOption[] = [
+  { value: "transportable", label: "Transportable", helper: "Small enough to move or deliver" },
+  { value: "mobile", label: "Mobile", helper: "Travels with renter, owner, or operator" },
+  { value: "fixed_in_place", label: "Fixed in place", helper: "Used where it is located" }
 ];
 const defaultChatWindowSize: ChatWindowSize = { width: 420, height: 520 };
 const minimizedChatWindowSize: ChatWindowSize = { width: 400, height: 56 };
@@ -446,10 +557,22 @@ export function AccountDashboard({ email, onSignOut }: AccountDashboardProps) {
   const [kind, setKind] = useState<ListingKind>("good");
   const [county, setCounty] = useState("Nairobi");
   const [price, setPrice] = useState("");
+  const [mobility, setMobility] = useState<ListingMobility>("transportable");
+  const [quantity, setQuantity] = useState("1");
   const [description, setDescription] = useState("");
   const [photos, setPhotos] = useState<ListingPhoto[]>([]);
   const [ownerListings, setOwnerListings] = useState<OwnerListing[]>(initialOwnerListings);
   const [completedRentalItems, setCompletedRentalItems] = useState<ActivityItem[]>([]);
+  const [bookedUnitCounts, setBookedUnitCounts] = useState<Record<string, number>>(() =>
+    activeRentalItems.reduce<Record<string, number>>((counts, item) => {
+      if (!item.marketplaceListingId) {
+        return counts;
+      }
+
+      counts[item.marketplaceListingId] = (counts[item.marketplaceListingId] ?? 0) + 1;
+      return counts;
+    }, {})
+  );
   const [savedMarketplaceItems, setSavedMarketplaceItems] = useState<ActivityItem[]>([]);
   const [threads, setThreads] = useState(() => mergeThreads(initialThreads));
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
@@ -462,6 +585,7 @@ export function AccountDashboard({ email, onSignOut }: AccountDashboardProps) {
   const [focusedPanel, setFocusedPanel] = useState<FocusedAccountPanel>("details");
   const [focusedDraft, setFocusedDraft] = useState("");
   const [focusedThread, setFocusedThread] = useState<ChatThread | null>(null);
+  const [focusedQuantity, setFocusedQuantity] = useState("1");
   const [chatWindowSize, setChatWindowSize] = useState<ChatWindowSize>(defaultChatWindowSize);
   const [chatMinimized, setChatMinimized] = useState(false);
   const [chatDraft, setChatDraft] = useState("");
@@ -471,7 +595,8 @@ export function AccountDashboard({ email, onSignOut }: AccountDashboardProps) {
     () => threads.find((thread) => thread.id === activeThreadId) ?? null,
     [activeThreadId, threads]
   );
-  const canCreate = title.trim().length > 2 && description.trim().length > 12;
+  const requestedOwnerQuantity = positiveInteger(quantity, 1);
+  const canCreate = title.trim().length > 2 && description.trim().length > 12 && requestedOwnerQuantity >= 1;
   const activeRentalsCount = activeRentalItems.length + completedRentalItems.length;
   const savedItemsCount = savedActivityItems.length + savedMarketplaceItems.length;
   const focusedListing = focusedListingId ? seededListings.find((listing) => listing.id === focusedListingId) ?? null : null;
@@ -486,7 +611,12 @@ export function AccountDashboard({ email, onSignOut }: AccountDashboardProps) {
     : null;
   const focusedGallery = focusedListing ? focusedGalleryForListing(focusedListing) : [];
   const focusedImage = focusedGallery[focusedImageIndex] ?? focusedGallery[0];
-  const focusedListingBooked = [...activeRentalItems, ...completedRentalItems].some((item) => item.marketplaceListingId === focusedListing?.id);
+  const focusedTotalUnits = focusedListing ? listingInventoryTotal(focusedListing) : 1;
+  const focusedBookedUnits = focusedListing ? Math.min(focusedTotalUnits, bookedUnitCounts[focusedListing.id] ?? 0) : 0;
+  const focusedAvailableUnits = Math.max(0, focusedTotalUnits - focusedBookedUnits);
+  const focusedSelectedQuantity = Math.min(positiveInteger(focusedQuantity, 1), Math.max(1, focusedAvailableUnits));
+  const focusedListingActiveForAccount = [...activeRentalItems, ...completedRentalItems].some((item) => item.marketplaceListingId === focusedListing?.id);
+  const focusedListingBooked = focusedListingActiveForAccount || focusedAvailableUnits <= 0;
 
   useEffect(() => {
     function refreshMarketplaceThreads() {
@@ -566,6 +696,8 @@ export function AccountDashboard({ email, onSignOut }: AccountDashboardProps) {
     setKind("good");
     setCounty("Nairobi");
     setPrice("");
+    setMobility("transportable");
+    setQuantity("1");
     setDescription("");
     setPhotos([]);
     setEditingListingId(null);
@@ -584,7 +716,13 @@ export function AccountDashboard({ email, onSignOut }: AccountDashboardProps) {
       price: price.trim() || "Price on request",
       description: description.trim(),
       photos,
-      status: editingListingId ? (ownerListings.find((item) => item.id === editingListingId)?.status ?? "Available") : "Available"
+      status: editingListingId ? (ownerListings.find((item) => item.id === editingListingId)?.status ?? "Available") : "Available",
+      mobility,
+      quantity: requestedOwnerQuantity,
+      bookedCount: Math.min(
+        requestedOwnerQuantity,
+        editingListingId ? (ownerListings.find((item) => item.id === editingListingId)?.bookedCount ?? 0) : 0
+      )
     };
 
     setOwnerListings((current) =>
@@ -616,6 +754,8 @@ export function AccountDashboard({ email, onSignOut }: AccountDashboardProps) {
     setKind(listing.kind);
     setCounty(listing.county);
     setPrice(listing.price);
+    setMobility(listing.mobility);
+    setQuantity(String(listing.quantity));
     setDescription(listing.description);
     setPhotos(listing.photos);
     setEditingListingId(listing.id);
@@ -640,6 +780,7 @@ export function AccountDashboard({ email, onSignOut }: AccountDashboardProps) {
     setFocusedPanel("details");
     setFocusedDraft("");
     setFocusedThread(null);
+    setFocusedQuantity("1");
   }
 
   function focusDmForListing(listing: ResourceListing) {
@@ -667,14 +808,15 @@ export function AccountDashboard({ email, onSignOut }: AccountDashboardProps) {
   }
 
   function proposeFocusedBooking() {
-    if (!focusedListing || !focusedQuote) {
+    if (!focusedListing || !focusedQuote || focusedListingBooked || focusedAvailableUnits <= 0) {
       return;
     }
 
+    const quantityToPropose = Math.min(focusedSelectedQuantity, focusedAvailableUnits);
     const thread = upsertMarketplaceThread(focusedListing, {
       id: `account-marketplace-proposal-${Date.now()}`,
       author: "system",
-      text: `Booking proposal prepared for ${kes(focusedQuote.totalDueNow.amount)} due now.`,
+      text: `Booking proposal prepared for ${quantityToPropose} item(s): ${kes(focusedQuote.totalDueNow.amount * quantityToPropose)} due now.`,
       time: "Now"
     });
     setFocusedThread(thread);
@@ -683,20 +825,30 @@ export function AccountDashboard({ email, onSignOut }: AccountDashboardProps) {
   }
 
   function completeFocusedBooking() {
-    if (!focusedListing || !focusedQuote) {
+    if (!focusedListing || !focusedQuote || focusedListingBooked || focusedAvailableUnits <= 0) {
       return;
     }
 
+    const quantityToBook = Math.min(focusedSelectedQuantity, focusedAvailableUnits);
+    const nextBookedUnits = Math.min(focusedTotalUnits, focusedBookedUnits + quantityToBook);
     const nextRental: ActivityItem = {
       id: `active-marketplace-${focusedListing.id}`,
       title: focusedListing.title,
-      description: `Booking completed from Saved items. Total due now ${kes(focusedQuote.totalDueNow.amount)}.`,
+      description: `Booking completed for ${quantityToBook} item(s). Total due now ${kes(focusedQuote.totalDueNow.amount * quantityToBook)}.`,
       status: "Active now",
-      meta: [focusedListing.location.county, kes(focusedQuote.rentalFee.amount), "Booked"],
+      meta: [
+        focusedListing.location.county,
+        kes(focusedQuote.rentalFee.amount * quantityToBook),
+        bookedUnitsLabel(nextBookedUnits, focusedTotalUnits)
+      ],
       actionLabel: "Open",
       marketplaceListingId: focusedListing.id
     };
 
+    setBookedUnitCounts((current) => ({
+      ...current,
+      [focusedListing.id]: nextBookedUnits
+    }));
     setCompletedRentalItems((current) => [
       nextRental,
       ...current.filter((item) => item.marketplaceListingId !== focusedListing.id)
@@ -755,6 +907,8 @@ export function AccountDashboard({ email, onSignOut }: AccountDashboardProps) {
       kind={kind}
       county={county}
       price={price}
+      mobility={mobility}
+      quantity={quantity}
       description={description}
       photos={photos}
       canCreate={canCreate}
@@ -763,6 +917,8 @@ export function AccountDashboard({ email, onSignOut }: AccountDashboardProps) {
       setKind={setKind}
       setCounty={setCounty}
       setPrice={setPrice}
+      setMobility={setMobility}
+      setQuantity={setQuantity}
       setDescription={setDescription}
       setPhotos={setPhotos}
       deletePhoto={deletePhoto}
@@ -786,7 +942,7 @@ export function AccountDashboard({ email, onSignOut }: AccountDashboardProps) {
   const sidePanel = <AccountSidePanel email={email} threads={threads} openThread={openThread} />;
 
   return (
-    <main className="min-h-screen bg-orbit-field text-orbit-ink">
+    <main className="min-h-screen overflow-x-hidden bg-orbit-field text-orbit-ink">
       <header className="theme-body-border border-b border-white/70 bg-orbit-panel/90">
         <div className="flex w-full items-center justify-between gap-3 px-4 py-4">
           <Link href="/" className="flex min-w-0 items-center gap-3" aria-label="RentOrbit home">
@@ -825,8 +981,8 @@ export function AccountDashboard({ email, onSignOut }: AccountDashboardProps) {
         </AccountMobilePanelOverlay>
       ) : null}
 
-      <div className="grid min-h-[calc(100svh-81px)] w-full gap-3 px-3 py-3 xl:h-[calc(100svh-81px)] xl:grid-cols-[300px_minmax(0,1fr)_390px] xl:overflow-hidden 2xl:grid-cols-[320px_minmax(0,1fr)_400px]">
-        <aside className="hidden h-fit self-start xl:sticky xl:top-0 xl:block xl:max-h-full xl:overflow-visible">
+      <div className="grid min-h-[calc(100svh-81px)] min-w-0 w-full gap-3 px-3 py-3 xl:h-[calc(100svh-81px)] xl:grid-cols-[300px_minmax(0,1fr)_390px] xl:overflow-hidden 2xl:grid-cols-[320px_minmax(0,1fr)_400px]">
+        <aside className="hidden min-w-0 h-fit self-start xl:sticky xl:top-0 xl:block xl:max-h-full xl:overflow-x-hidden xl:overflow-y-visible">
           {createListingPanel}
         </aside>
 
@@ -851,7 +1007,7 @@ export function AccountDashboard({ email, onSignOut }: AccountDashboardProps) {
           />
         </section>
 
-        <aside className="hidden h-fit self-start xl:sticky xl:top-0 xl:block xl:max-h-full xl:overflow-visible">
+        <aside className="hidden min-w-0 h-fit self-start xl:sticky xl:top-0 xl:block xl:max-h-full xl:overflow-x-hidden xl:overflow-y-visible">
           {sidePanel}
         </aside>
       </div>
@@ -886,6 +1042,12 @@ export function AccountDashboard({ email, onSignOut }: AccountDashboardProps) {
           setZoom={setFocusedZoom}
           activeMode={focusedMode}
           quote={focusedQuote}
+          bookingQuantity={focusedQuantity}
+          setBookingQuantity={setFocusedQuantity}
+          selectedQuantity={focusedSelectedQuantity}
+          totalUnits={focusedTotalUnits}
+          bookedUnits={focusedBookedUnits}
+          availableUnits={focusedAvailableUnits}
           panel={focusedPanel}
           setPanel={setFocusedPanel}
           thread={focusedThread ?? marketplaceThreadForListing(focusedListing)}
@@ -1047,6 +1209,8 @@ function CreateListingPanel({
   kind,
   county,
   price,
+  mobility,
+  quantity,
   description,
   photos,
   canCreate,
@@ -1055,6 +1219,8 @@ function CreateListingPanel({
   setKind,
   setCounty,
   setPrice,
+  setMobility,
+  setQuantity,
   setDescription,
   setPhotos,
   deletePhoto,
@@ -1064,6 +1230,8 @@ function CreateListingPanel({
   kind: ListingKind;
   county: string;
   price: string;
+  mobility: ListingMobility;
+  quantity: string;
   description: string;
   photos: ListingPhoto[];
   canCreate: boolean;
@@ -1072,13 +1240,15 @@ function CreateListingPanel({
   setKind: (value: ListingKind) => void;
   setCounty: (value: string) => void;
   setPrice: (value: string) => void;
+  setMobility: (value: ListingMobility) => void;
+  setQuantity: (value: string) => void;
   setDescription: (value: string) => void;
   setPhotos: Dispatch<SetStateAction<ListingPhoto[]>>;
   deletePhoto: (photoId: string) => void;
   saveListing: () => void;
 }) {
   return (
-    <section className={`${panelClass} max-h-full overflow-auto p-5`}>
+    <section className={`${panelClass} max-h-full min-w-0 overflow-y-auto overflow-x-hidden p-5`}>
       <div className="mb-5 grid min-h-[76px] grid-cols-[minmax(0,1fr)_56px] items-start gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2 text-sm font-bold text-orbit-green">
@@ -1108,6 +1278,14 @@ function CreateListingPanel({
           labelClassName={labelClass}
         />
 
+        <CustomSelect
+          label="Mobility"
+          value={mobility}
+          options={listingMobilityOptions}
+          onChange={(value) => setMobility(value as ListingMobility)}
+          labelClassName={labelClass}
+        />
+
         <label className="block">
           <span className={labelClass}>County</span>
           <input value={county} onChange={(event) => setCounty(event.target.value)} className={fieldClass} type="text" />
@@ -1116,6 +1294,19 @@ function CreateListingPanel({
         <label className="block">
           <span className={labelClass}>Price</span>
           <input value={price} onChange={(event) => setPrice(event.target.value)} className={fieldClass} type="text" />
+        </label>
+
+        <label className="block">
+          <span className={labelClass}>Number of items</span>
+          <input
+            value={quantity}
+            onChange={(event) => setQuantity(event.target.value)}
+            onBlur={() => setQuantity(String(positiveInteger(quantity, 1)))}
+            className={fieldClass}
+            type="number"
+            min={1}
+            inputMode="numeric"
+          />
         </label>
 
         <label className="block">
@@ -1224,7 +1415,12 @@ function ActivityEntriesPanel({
     title: listing.title,
     description: listing.description,
     status: listing.status,
-    meta: [listing.county, listing.price, listing.kind],
+    meta: [
+      listing.county,
+      listing.price,
+      mobilityLabel(listing.mobility),
+      bookedUnitsLabel(listing.bookedCount, listing.quantity)
+    ],
     actionLabel: "Edit",
     editableListing: listing
   }));
@@ -1345,11 +1541,19 @@ function ActivityCard({
       </div>
       <div className="mt-4 flex items-center justify-between gap-2">
         <div className="flex min-w-0 flex-wrap gap-2 text-xs font-black text-orbit-ink/70">
-          {item.meta.map((detail) => (
-            <span key={detail} className="rounded-full bg-orbit-field px-3 py-2">
-              {detail}
-            </span>
-          ))}
+          {item.meta.map((detail, index) => {
+            const detailKind = kindFromTagText(detail);
+
+            return detailKind ? (
+              <span key={`${item.id}-${detail}-${index}`} className="kind-tag orbit-tag rounded-full px-3 py-2" data-kind={detailKind}>
+                {listingKindLabel(detailKind)}
+              </span>
+            ) : (
+              <span key={`${item.id}-${detail}-${index}`} className="rounded-full bg-orbit-field px-3 py-2">
+                {detail}
+              </span>
+            );
+          })}
         </div>
         {item.actionLabel ? (
           <button
@@ -1390,6 +1594,12 @@ function AccountFocusedListingOverlay({
   setZoom,
   activeMode,
   quote,
+  bookingQuantity,
+  setBookingQuantity,
+  selectedQuantity,
+  totalUnits,
+  bookedUnits,
+  availableUnits,
   panel,
   setPanel,
   thread,
@@ -1411,6 +1621,12 @@ function AccountFocusedListingOverlay({
   setZoom: Dispatch<SetStateAction<number>>;
   activeMode: OperationMode;
   quote: ReturnType<typeof calculateBookingQuote>;
+  bookingQuantity: string;
+  setBookingQuantity: (value: string) => void;
+  selectedQuantity: number;
+  totalUnits: number;
+  bookedUnits: number;
+  availableUnits: number;
   panel: FocusedAccountPanel;
   setPanel: (panel: FocusedAccountPanel) => void;
   thread: ChatThread;
@@ -1446,7 +1662,7 @@ function AccountFocusedListingOverlay({
 
   return (
     <div className="fixed inset-0 z-[80] bg-orbit-field p-2 text-orbit-ink sm:p-3" role="dialog" aria-modal="true" aria-label={listing.title}>
-      <div className="grid h-full overflow-hidden rounded-[34px] border-2 border-[#4391F5] bg-orbit-panel shadow-[0_24px_70px_rgba(25,32,29,0.22)] lg:grid-cols-[minmax(0,7fr)_minmax(340px,3fr)]">
+      <div className="grid h-full min-w-0 overflow-hidden rounded-[34px] border-2 border-[#4391F5] bg-orbit-panel shadow-[0_24px_70px_rgba(25,32,29,0.22)] lg:grid-cols-[minmax(0,7fr)_minmax(340px,3fr)]">
         <section className="relative min-h-[55svh] overflow-hidden bg-[#1A1A1A] lg:min-h-0">
           <div className="absolute left-4 top-4 z-20 flex items-center gap-2 rounded-full bg-black/65 p-1 text-white backdrop-blur">
             <button
@@ -1527,12 +1743,18 @@ function AccountFocusedListingOverlay({
           </div>
         </section>
 
-        <aside className="min-h-0 overflow-hidden bg-orbit-panel">
+        <aside className="min-h-0 min-w-0 overflow-hidden bg-orbit-panel">
           {panel === "details" ? (
             <AccountFocusedDetailsPanel
               listing={listing}
               activeMode={activeMode}
               quote={quote}
+              bookingQuantity={bookingQuantity}
+              setBookingQuantity={setBookingQuantity}
+              selectedQuantity={selectedQuantity}
+              totalUnits={totalUnits}
+              bookedUnits={bookedUnits}
+              availableUnits={availableUnits}
               onDm={onDm}
               proposeBooking={proposeBooking}
               completeBooking={completeBooking}
@@ -1557,6 +1779,12 @@ function AccountFocusedDetailsPanel({
   listing,
   activeMode,
   quote,
+  bookingQuantity,
+  setBookingQuantity,
+  selectedQuantity,
+  totalUnits,
+  bookedUnits,
+  availableUnits,
   onDm,
   proposeBooking,
   completeBooking,
@@ -1565,18 +1793,39 @@ function AccountFocusedDetailsPanel({
   listing: ResourceListing;
   activeMode: OperationMode;
   quote: ReturnType<typeof calculateBookingQuote>;
+  bookingQuantity: string;
+  setBookingQuantity: (value: string) => void;
+  selectedQuantity: number;
+  totalUnits: number;
+  bookedUnits: number;
+  availableUnits: number;
   onDm: () => void;
   proposeBooking: () => void;
   completeBooking: () => void;
   booked: boolean;
 }) {
+  const quantityControlsDisabled = booked || availableUnits <= 0;
+  const totalRental = quote.rentalFee.amount * selectedQuantity;
+  const totalPlatform = quote.platformFee.amount * selectedQuantity;
+  const totalDeposit = quote.deposit.amount * selectedQuantity;
+  const totalDueNow = quote.totalDueNow.amount * selectedQuantity;
+
+  function updateBookingQuantity(nextValue: number) {
+    const maxQuantity = Math.max(1, availableUnits);
+    setBookingQuantity(String(Math.min(maxQuantity, Math.max(1, Math.floor(nextValue)))));
+  }
+
   return (
-    <section className="grid h-full min-h-0 content-start gap-4 overflow-y-auto p-4">
+    <section className="grid h-full min-h-0 min-w-0 content-start gap-4 overflow-y-auto overflow-x-hidden p-4">
       <div>
         <div className="flex flex-wrap gap-2 text-xs font-bold">
           <span className="orbit-tag rounded-full bg-orbit-field px-3 py-1">{listing.location.county}</span>
           <span className="orbit-tag rounded-full bg-orbit-field px-3 py-1">{listing.category}</span>
-          <span className="orbit-tag rounded-full bg-orbit-field px-3 py-1">{listing.kind}</span>
+          <span className="kind-tag orbit-tag rounded-full px-3 py-1" data-kind={listing.kind}>
+            {listingKindLabel(listing.kind)}
+          </span>
+          <span className="orbit-tag rounded-full bg-orbit-field px-3 py-1">{mobilityLabel(listingMobility(listing))}</span>
+          <span className="orbit-tag rounded-full bg-orbit-field px-3 py-1">{bookedUnitsLabel(bookedUnits, totalUnits)}</span>
         </div>
         <h2 className="mt-4 text-2xl font-black">{listing.title}</h2>
         <p className="mt-2 text-sm leading-6 text-neutral-600">{listing.description}</p>
@@ -1607,16 +1856,66 @@ function AccountFocusedDetailsPanel({
         <p className="mt-1 text-lg font-black text-orbit-green">{readableMode(activeMode)}</p>
       </div>
 
+      <div className="min-w-0 rounded-[24px] border border-orbit-line bg-orbit-field p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-xs font-black uppercase text-orbit-ink/55">Booking quantity</p>
+            <p className="mt-1 text-sm font-semibold text-orbit-ink/60">
+              {availableUnits} available • {bookedUnitsLabel(bookedUnits, totalUnits)}
+            </p>
+          </div>
+          <span className="rounded-full bg-orbit-panel px-3 py-2 text-xs font-black text-orbit-green">
+            Max {availableUnits}
+          </span>
+        </div>
+        <div className="mt-3 flex h-14 min-w-0 items-center rounded-full border border-orbit-line bg-orbit-panel p-[3px]">
+          <button
+            type="button"
+            onClick={() => updateBookingQuantity(selectedQuantity - 1)}
+            disabled={quantityControlsDisabled || selectedQuantity <= 1}
+            className="flex h-full aspect-square shrink-0 items-center justify-center rounded-full bg-orbit-soft text-lg font-black disabled:cursor-not-allowed disabled:opacity-35"
+            title="Decrease quantity"
+          >
+            -
+          </button>
+          <input
+            value={bookingQuantity}
+            onChange={(event) => {
+              if (!event.target.value) {
+                setBookingQuantity("");
+                return;
+              }
+
+              updateBookingQuantity(positiveInteger(event.target.value, 1));
+            }}
+            onBlur={() => updateBookingQuantity(positiveInteger(bookingQuantity, 1))}
+            disabled={quantityControlsDisabled}
+            type="text"
+            inputMode="numeric"
+            className="h-full min-w-0 flex-1 bg-transparent px-3 text-center text-lg font-black text-orbit-ink outline-none focus:outline-none focus:ring-0 focus-visible:outline-none disabled:opacity-50"
+          />
+          <button
+            type="button"
+            onClick={() => updateBookingQuantity(selectedQuantity + 1)}
+            disabled={quantityControlsDisabled || selectedQuantity >= availableUnits}
+            className="flex h-full aspect-square shrink-0 items-center justify-center rounded-full bg-orbit-green text-lg font-black text-orbit-field disabled:cursor-not-allowed disabled:grayscale disabled:opacity-35"
+            title="Increase quantity"
+          >
+            +
+          </button>
+        </div>
+      </div>
+
       <div className="grid grid-cols-2 gap-2 border-y border-orbit-line py-3 text-sm">
-        <SummaryLine label="Rental" value={kes(quote.rentalFee.amount)} />
-        <SummaryLine label="Platform" value={kes(quote.platformFee.amount)} />
-        <SummaryLine label="Deposit" value={kes(quote.deposit.amount)} />
-        <SummaryLine label="Due now" value={kes(quote.totalDueNow.amount)} strong />
+        <SummaryLine label="Rental" value={kes(totalRental)} />
+        <SummaryLine label="Platform" value={kes(totalPlatform)} />
+        <SummaryLine label="Deposit" value={kes(totalDeposit)} />
+        <SummaryLine label="Due now" value={kes(totalDueNow)} strong />
       </div>
 
       <div className="grid grid-cols-2 gap-2 text-sm">
         <IconFact icon={<PackageCheck className="h-4 w-4" aria-hidden="true" />} label={listing.logistics.deliveryModes.join(", ")} />
-        <IconFact icon={<CalendarClock className="h-4 w-4" aria-hidden="true" />} label={`${quote.units} billed unit(s)`} />
+        <IconFact icon={<CalendarClock className="h-4 w-4" aria-hidden="true" />} label={`${selectedQuantity} item(s), ${quote.units} billed unit(s)`} />
       </div>
 
       <div className="grid gap-2">
@@ -1630,7 +1929,8 @@ function AccountFocusedDetailsPanel({
           </button>
           <button
             onClick={proposeBooking}
-            className="inline-flex items-center justify-center gap-2 rounded-full border border-orbit-line px-3 py-3 text-sm font-bold"
+            disabled={booked}
+            className="inline-flex items-center justify-center gap-2 rounded-full border border-orbit-line px-3 py-3 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-45"
           >
             <FileSignature className="h-4 w-4" aria-hidden="true" />
             Propose
@@ -1642,7 +1942,7 @@ function AccountFocusedDetailsPanel({
           className="inline-flex min-h-14 items-center justify-center gap-2 rounded-full bg-orbit-green px-4 text-sm font-black text-orbit-field disabled:cursor-not-allowed disabled:grayscale disabled:opacity-50"
         >
           <PackageCheck className="h-4 w-4" aria-hidden="true" />
-          {booked ? "Already active" : "Complete booking"}
+          {booked ? (availableUnits <= 0 ? "Unavailable" : "Already active") : `Complete ${selectedQuantity} item(s)`}
         </button>
       </div>
     </section>

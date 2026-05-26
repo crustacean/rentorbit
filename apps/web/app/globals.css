@@ -40,11 +40,13 @@
 
 html {
   min-width: 320px;
+  overflow-x: hidden;
 }
 
 body {
   margin: 0;
   min-height: 100vh;
+  overflow-x: hidden;
   background:
     linear-gradient(180deg, rgb(var(--color-orbit-panel) / 0.92), rgb(var(--color-orbit-field) / 0.98)),
     rgb(var(--color-orbit-field));
@@ -59,6 +61,17 @@ input,
 select,
 textarea {
   font: inherit;
+}
+
+input[type="number"] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
 
 button:focus-visible,
@@ -86,6 +99,36 @@ textarea:focus-visible {
 
 :root[data-theme="dark"] .orbit-tag svg {
   color: #e0e0e0;
+}
+
+.kind-tag[data-kind="good"] {
+  background-color: #3b82f6;
+  border-color: #3b82f6;
+  color: #ffffff;
+}
+
+.kind-tag[data-kind="service"] {
+  background-color: #10b981;
+  border-color: #10b981;
+  color: #ffffff;
+}
+
+.kind-tag[data-kind="personnel"] {
+  background-color: #8b5cf6;
+  border-color: #8b5cf6;
+  color: #ffffff;
+}
+
+.kind-tag svg {
+  color: currentColor;
+}
+
+:root[data-theme="dark"] .kind-tag[data-kind] {
+  color: #ffffff;
+}
+
+:root[data-theme="dark"] .kind-tag[data-kind] svg {
+  color: currentColor;
 }
 
 :root[data-theme="dark"] .image-overlay-element,
