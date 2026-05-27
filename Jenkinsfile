@@ -5,6 +5,7 @@ pipeline {
         APP_NAME = 'rentorbit'
         WEB_IMAGE_NAME = 'em22435/rentorbit-web'
         API_IMAGE_NAME = 'em22435/rentorbit-api'
+        NODE_BUILD_IMAGE = 'node:22-bookworm-slim'
         IMAGE_TAG = "${env.BUILD_NUMBER}"
 
         DOCKER_CREDENTIALS = 'docker-hub-credentials'
@@ -29,22 +30,25 @@ pipeline {
     stages {
         stage('Install') {
             steps {
-                sh 'node --version'
-                sh 'npm --version'
-                sh 'npm ci'
+                script {
+                    runNode('node --version && npm --version && npm ci')
+                }
             }
         }
 
         stage('Validate') {
             steps {
-                sh 'npm run typecheck'
-                sh 'npm test --workspaces --if-present'
+                script {
+                    runNode('npm run typecheck && npm test --workspaces --if-present')
+                }
             }
         }
 
         stage('Build Workspaces') {
             steps {
-                sh 'npm run build --workspaces --if-present'
+                script {
+                    runNode('npm run build --workspaces --if-present')
+                }
             }
         }
 
@@ -156,6 +160,12 @@ pipeline {
             sh "docker rmi ${API_IMAGE_NAME}:latest || true"
             sh 'rm -rf prepared-k8s'
         }
+    }
+}
+
+def runNode(String command) {
+    docker.image(env.NODE_BUILD_IMAGE).inside('-u root') {
+        sh command
     }
 }
 
