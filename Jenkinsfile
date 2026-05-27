@@ -179,12 +179,10 @@ def repairWorkspacePermissions() {
         sh """
             chown -R ${uid}:${gid} \
                 node_modules \
-                apps/*/node_modules \
-                packages/*/node_modules \
+                apps \
+                packages \
                 .npm-cache \
-                packages/shared/dist \
-                apps/api/dist \
-                apps/web/.next \
+                .cache \
                 2>/dev/null || true
         """
     }
