@@ -28,6 +28,14 @@ pipeline {
     }
 
     stages {
+        stage('Prepare Workspace') {
+            steps {
+                script {
+                    repairWorkspacePermissions()
+                }
+            }
+        }
+
         stage('Install') {
             steps {
                 script {
@@ -160,6 +168,25 @@ pipeline {
             sh "docker rmi ${API_IMAGE_NAME}:latest || true"
             sh 'rm -rf prepared-k8s'
         }
+    }
+}
+
+def repairWorkspacePermissions() {
+    def uid = sh(script: 'id -u', returnStdout: true).trim()
+    def gid = sh(script: 'id -g', returnStdout: true).trim()
+
+    docker.image(env.NODE_BUILD_IMAGE).inside('-u root') {
+        sh """
+            chown -R ${uid}:${gid} \
+                node_modules \
+                apps/*/node_modules \
+                packages/*/node_modules \
+                .npm-cache \
+                packages/shared/dist \
+                apps/api/dist \
+                apps/web/.next \
+                2>/dev/null || true
+        """
     }
 }
 
