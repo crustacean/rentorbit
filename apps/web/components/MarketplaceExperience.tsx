@@ -5,16 +5,20 @@ import {
   CalendarClock,
   ChevronLeft,
   ChevronRight,
-  CircleUserRound,
+  ChevronDown,
+  Compass,
   FileSignature,
   Filter,
+  Flame,
   Handshake,
   Heart,
   MapPin,
   MessageCircle,
   PackageCheck,
   Search,
+  SearchX,
   Send,
+  Star,
   Truck,
   UserRoundCheck,
   ZoomIn,
@@ -22,14 +26,18 @@ import {
   X
 } from "lucide-react";
 import { CustomSelect, type CustomSelectOption } from "@/components/CustomSelect";
-import { ThemeSwitcher } from "@/components/ThemeSwitcher";
+import { SiteHeader } from "@/components/SiteHeader";
+import { AuthModal, type AccountMode } from "@/components/AuthModal";
+import { readAccountSession } from "@/lib/accountSession";
 import Link from "next/link";
 import {
   calculateBookingQuote,
+  availabilityState,
   createContractSummary,
   filterListings,
   kenyaCounties,
   marketplaceCategories,
+  publicLocationOffset,
   seededListings,
   type ContractSummary,
   type Coordinates,
@@ -37,7 +45,7 @@ import {
   type ResourceListing,
   type SearchResult
 } from "@rentorbit/shared";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 
 const countyOrigins: Record<string, Coordinates> = {
   Nairobi: { latitude: -1.286389, longitude: 36.817223 },
@@ -321,6 +329,9 @@ export function MarketplaceExperience() {
   const [focusedPanel, setFocusedPanel] = useState<FocusedPanel>("details");
   const [focusedDraft, setFocusedDraft] = useState("");
   const [focusedThread, setFocusedThread] = useState<AccountChatThread | null>(null);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [authModalMode, setAuthModalMode] = useState<AccountMode>("signin");
+  const [pendingDmListingId, setPendingDmListingId] = useState<string | null>(null);
   const [savedListingIds, setSavedListingIds] = useState<string[]>([]);
   const [bookingQuantity, setBookingQuantity] = useState("1");
   const [bookedUnitCounts] = useState<Record<string, number>>(seededBookedUnits);
@@ -419,12 +430,47 @@ export function MarketplaceExperience() {
       end: filters.end
     });
   }, [filters]);
+  const popularResults = useMemo(() => {
+    const activeListings = seededListings
+      .filter((listing) => listing.status === "active" && listing.media.length > 0)
+      .sort((left, right) => right.rating * 100 + right.reviewCount - (left.rating * 100 + left.reviewCount));
+    const localListings = filters.county !== "all"
+      ? activeListings.filter((listing) => listing.location.county === filters.county)
+      : [];
+    const recommendationSource = localListings.length >= 3 ? localListings : activeListings;
+
+    return recommendationSource.slice(0, 3).map((listing) => ({
+      listing,
+      publicCoordinates: publicLocationOffset(listing),
+      availabilityState: availabilityState(listing, {
+        start: filters.start,
+        end: filters.end
+      })
+    })) satisfies SearchResult[];
+  }, [filters.county, filters.end, filters.start]);
 
   useEffect(() => {
     if (results.length > 0 && !results.some((result) => result.listing.id === selectedId)) {
-      setSelectedId(results[0]?.listing.id ?? selectedId);
+      const nextListing = results[0]?.listing;
+      setSelectedId(nextListing?.id ?? selectedId);
+      setSelectedMode(nextListing?.modeRules[0]?.mode ?? "self_operated");
+      setBookingQuantity("1");
+      setContract(null);
+      return;
     }
-  }, [results, selectedId]);
+
+    if (results.length === 0 && popularResults.length > 0 && !popularResults.some((result) => result.listing.id === selectedId)) {
+      const nextListing = popularResults[0]?.listing;
+      if (!nextListing) {
+        return;
+      }
+
+      setSelectedId(nextListing.id);
+      setSelectedMode(nextListing.modeRules[0]?.mode ?? "self_operated");
+      setBookingQuantity("1");
+      setContract(null);
+    }
+  }, [popularResults, results, selectedId]);
 
   useEffect(() => {
     if (requestedListingRef.current !== selectedId) {
@@ -444,7 +490,9 @@ export function MarketplaceExperience() {
     return null;
   }
 
-  const selectedResult = results.find((result) => result.listing.id === selectedId) ?? results[0];
+  const selectedResult = results.length > 0
+    ? results.find((result) => result.listing.id === selectedId) ?? results[0]
+    : popularResults.find((result) => result.listing.id === selectedId) ?? popularResults[0];
   const selectedListing = selectedResult?.listing ?? firstListing;
   const selectedPublicCoordinates = selectedResult?.publicCoordinates;
   const selectedRule = selectedListing.modeRules.find((rule) => rule.mode === selectedMode) ?? selectedListing.modeRules[0];
@@ -487,7 +535,34 @@ export function MarketplaceExperience() {
     : 0;
 
   function patchFilters(next: Partial<FilterState>) {
-    setFilters((current) => ({ ...current, ...next }));
+    setFilters((current) => normalizeFilterWindow(current, next));
+  }
+
+  function clearFilters() {
+    if (!firstListing) {
+      return;
+    }
+
+    setFilters(initialFilters);
+    setSelectedId(firstListing.id);
+    setSelectedMode(firstListing.modeRules[0]?.mode ?? "self_operated");
+    setBookingQuantity("1");
+    setContract(null);
+  }
+
+  function broadenSearch() {
+    setFilters((current) =>
+      normalizeFilterWindow(current, {
+        query: "",
+        category: "all",
+        county: "all",
+        radiusKm: 300,
+        operationMode: "all",
+        includeCountrywide: true
+      })
+    );
+    setBookingQuantity("1");
+    setContract(null);
   }
 
   function selectListing(listing: ResourceListing) {
@@ -508,10 +583,47 @@ export function MarketplaceExperience() {
     setBookingQuantity("1");
   }
 
-  function focusDmForListing(listing: ResourceListing) {
+  function openFocusedDmListing(listing: ResourceListing) {
+    selectListing(listing);
+    setFocusedListingId(listing.id);
+    setFocusedImageIndex(0);
+    setFocusedZoom(1);
+    setFocusedDraft("");
     const thread = upsertMarketplaceThread(listing);
     setFocusedThread(thread);
     setFocusedPanel("chat");
+    setBookingQuantity("1");
+  }
+
+  function requestDmForListing(listing: ResourceListing) {
+    if (!readAccountSession()) {
+      setPendingDmListingId(listing.id);
+      setAuthModalMode("signin");
+      setAuthModalOpen(true);
+      return;
+    }
+
+    openFocusedDmListing(listing);
+  }
+
+  function closeDmAuthModal() {
+    setAuthModalOpen(false);
+    setPendingDmListingId(null);
+  }
+
+  function handleDmAuthenticated() {
+    const listingId = pendingDmListingId;
+    setAuthModalOpen(false);
+    setPendingDmListingId(null);
+
+    if (!listingId) {
+      return;
+    }
+
+    const listing = seededListings.find((candidate) => candidate.id === listingId);
+    if (listing) {
+      openFocusedDmListing(listing);
+    }
   }
 
   function sendFocusedMessage() {
@@ -586,30 +698,7 @@ export function MarketplaceExperience() {
 
   return (
     <main className="min-h-screen overflow-x-hidden bg-orbit-field">
-      <header className="theme-body-border border-b border-white/70 bg-orbit-panel/90">
-        <div className="flex w-full items-center justify-between gap-3 px-4 py-4">
-          <Link href="/" className="flex min-w-0 items-center gap-3" aria-label="RentOrbit home">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-orbit-green text-orbit-field">
-              <span className="text-lg font-black">RO</span>
-            </div>
-            <div className="min-w-0">
-              <h1 className="truncate text-xl font-black text-orbit-ink sm:text-2xl">RentOrbit</h1>
-              <p className="truncate text-sm text-neutral-600">Kenya rentals, services, personnel</p>
-            </div>
-          </Link>
-          <div className="flex shrink-0 items-center gap-2">
-            <ThemeSwitcher compact />
-            <Link
-              href="/account"
-              className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-orbit-panel/90 text-orbit-ink shadow-[0_2px_14px_rgba(25,32,29,0.12)] backdrop-blur transition-colors hover:bg-orbit-panel focus-visible:outline-none"
-              title="Account"
-            >
-              <CircleUserRound className="h-7 w-7" aria-hidden="true" />
-              <span className="sr-only">Account</span>
-            </Link>
-          </div>
-        </div>
-      </header>
+      <SiteHeader active="rent" />
 
       <MobilePanelBar onOpen={setMobilePanel} />
 
@@ -632,7 +721,7 @@ export function MarketplaceExperience() {
               bookedUnits={selectedBookedUnits}
               availableUnits={selectedAvailableUnits}
               setSelectedMode={setSelectedMode}
-              setChatLines={setChatLines}
+              onDm={requestDmForListing}
               proposeBooking={proposeBooking}
             />
           ) : null}
@@ -649,19 +738,33 @@ export function MarketplaceExperience() {
 
           <div className="grid gap-3">
             <div className="rounded-[30px] bg-orbit-panel/35 p-3">
-              <div className="grid gap-x-3 gap-y-3 lg:grid-cols-2 2xl:grid-cols-3">
-                {results.map((result) => (
-                  <MarketplaceListingCard
-                    key={result.listing.id}
-                    result={result}
-                    selected={selectedListing.id === result.listing.id}
-                    saved={savedListingIds.includes(result.listing.id)}
-                    onSelect={() => selectListing(result.listing)}
-                    onOpen={() => openFocusedListing(result.listing)}
-                    onSave={() => saveListingToAccount(result.listing)}
-                  />
-                ))}
-              </div>
+              {results.length > 0 ? (
+                <div className="grid gap-x-3 gap-y-3 lg:grid-cols-2 2xl:grid-cols-3">
+                  {results.map((result) => (
+                    <MarketplaceListingCard
+                      key={result.listing.id}
+                      result={result}
+                      selected={selectedListing.id === result.listing.id}
+                      saved={savedListingIds.includes(result.listing.id)}
+                      onSelect={() => selectListing(result.listing)}
+                      onOpen={() => openFocusedListing(result.listing)}
+                      onSave={() => saveListingToAccount(result.listing)}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <EmptyMarketplaceState
+                  filters={filters}
+                  recommendations={popularResults}
+                  selectedListingId={selectedListing.id}
+                  savedListingIds={savedListingIds}
+                  onClearFilters={clearFilters}
+                  onBroadenSearch={broadenSearch}
+                  onSelectListing={selectListing}
+                  onOpenListing={openFocusedListing}
+                  onSaveListing={saveListingToAccount}
+                />
+              )}
             </div>
           </div>
         </section>
@@ -679,7 +782,7 @@ export function MarketplaceExperience() {
             bookedUnits={selectedBookedUnits}
             availableUnits={selectedAvailableUnits}
             setSelectedMode={setSelectedMode}
-            setChatLines={setChatLines}
+            onDm={requestDmForListing}
             proposeBooking={proposeBooking}
           />
         </aside>
@@ -710,12 +813,199 @@ export function MarketplaceExperience() {
           draft={focusedDraft}
           setDraft={setFocusedDraft}
           sendMessage={sendFocusedMessage}
-          onDm={() => focusDmForListing(focusedListing)}
+          onDm={() => requestDmForListing(focusedListing)}
           proposeBooking={proposeBooking}
           onClose={() => setFocusedListingId(null)}
         />
       ) : null}
+
+      <AuthModal
+        open={authModalOpen}
+        initialMode={authModalMode}
+        onClose={closeDmAuthModal}
+        onAuthenticated={handleDmAuthenticated}
+      />
     </main>
+  );
+}
+
+function EmptyMarketplaceState({
+  filters,
+  recommendations,
+  selectedListingId,
+  savedListingIds,
+  onClearFilters,
+  onBroadenSearch,
+  onSelectListing,
+  onOpenListing,
+  onSaveListing
+}: {
+  filters: FilterState;
+  recommendations: SearchResult[];
+  selectedListingId: string;
+  savedListingIds: string[];
+  onClearFilters: () => void;
+  onBroadenSearch: () => void;
+  onSelectListing: (listing: ResourceListing) => void;
+  onOpenListing: (listing: ResourceListing) => void;
+  onSaveListing: (listing: ResourceListing) => void;
+}) {
+  const areaLabel = filters.county === "all" ? "Kenya" : filters.county;
+
+  return (
+    <div className="grid min-h-[calc(100svh-190px)] content-between gap-10 rounded-[28px] bg-orbit-field/45 px-4 py-8 sm:px-6 lg:px-8">
+      <section className="mx-auto flex max-w-2xl flex-col items-center text-center">
+        <div className="relative mb-6 h-48 w-48 sm:h-56 sm:w-56">
+          <div className="absolute inset-0 rounded-full bg-orbit-soft/45" />
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="relative z-10 flex h-24 w-24 rotate-12 items-center justify-center rounded-[28px] bg-[#EFBF04] text-[#403301] shadow-[0_18px_34px_rgba(25,32,29,0.14)] sm:h-28 sm:w-28">
+              <SearchX className="h-12 w-12" aria-hidden="true" />
+            </div>
+            <span className="absolute right-7 top-4 z-20 flex h-12 w-12 items-center justify-center rounded-full bg-orbit-panel text-[#705d00] shadow-[0_10px_24px_rgba(25,32,29,0.12)] sm:right-8 sm:h-14 sm:w-14">
+              <Compass className="h-6 w-6" aria-hidden="true" />
+            </span>
+          </div>
+        </div>
+
+        <h2 className="text-2xl font-black text-orbit-ink sm:text-3xl">We couldn&apos;t find any matches</h2>
+        <p className="mt-3 max-w-xl text-sm font-semibold leading-6 text-orbit-ink/68 sm:text-base">
+          Try adjusting your filters, widening your search radius, or exploring another category. New rentals from local owners keep arriving across {areaLabel}.
+        </p>
+
+        <div className="mt-7 flex flex-col gap-3 sm:flex-row">
+          <button
+            type="button"
+            onClick={onClearFilters}
+            className="orbit-cta-gold inline-flex min-h-12 items-center justify-center rounded-[14px] px-7 text-sm font-black shadow-[0_10px_24px_rgba(239,191,4,0.18)]"
+          >
+            Clear all filters
+          </button>
+          <button
+            type="button"
+            onClick={onBroadenSearch}
+            className="inline-flex min-h-12 items-center justify-center gap-2 rounded-[14px] bg-orbit-panel px-7 text-sm font-black text-orbit-ink shadow-[0_10px_24px_rgba(25,32,29,0.08)] transition-colors hover:bg-orbit-soft/70"
+          >
+            <Compass className="h-4 w-4 text-[#705d00]" aria-hidden="true" />
+            Browse wider area
+          </button>
+        </div>
+      </section>
+
+      <section>
+        <div className="mb-4 flex items-center justify-between gap-4">
+          <h3 className="flex items-center gap-2 text-base font-black text-orbit-ink">
+            <Flame className="h-4 w-4 text-[#EFBF04]" aria-hidden="true" />
+            Popular in your area
+          </h3>
+          <button
+            type="button"
+            onClick={onClearFilters}
+            className="hidden items-center gap-1 text-xs font-black text-[#705d00] hover:underline sm:inline-flex"
+          >
+            View all
+            <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />
+          </button>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-3">
+          {recommendations.map((result) => (
+            <EmptyRecommendationCard
+              key={result.listing.id}
+              result={result}
+              selected={selectedListingId === result.listing.id}
+              saved={savedListingIds.includes(result.listing.id)}
+              onSelect={() => onSelectListing(result.listing)}
+              onOpen={() => onOpenListing(result.listing)}
+              onSave={() => onSaveListing(result.listing)}
+            />
+          ))}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function EmptyRecommendationCard({
+  result,
+  selected,
+  saved,
+  onSelect,
+  onOpen,
+  onSave
+}: {
+  result: SearchResult;
+  selected: boolean;
+  saved: boolean;
+  onSelect: () => void;
+  onOpen: () => void;
+  onSave: () => void;
+}) {
+  const listing = result.listing;
+  const media = listing.media[0];
+  const rule = listing.modeRules[0];
+  const rate = rule?.pricing.rate.amount ?? 0;
+  const metric = rule?.pricing.billingMetric ?? "daily";
+  const rateLabel = metric === "hourly" ? "Hourly rate" : metric === "fixed" ? "Per booking" : `${metric} rate`;
+
+  return (
+    <article
+      className="group overflow-hidden rounded-[22px] border-2 border-transparent bg-orbit-panel text-left shadow-[0_12px_28px_rgba(25,32,29,0.08)] data-[selected=true]:border-[#4391F5]"
+      data-selected={selected ? "true" : "false"}
+    >
+      <button type="button" onClick={onSelect} className="block w-full text-left focus-visible:outline-none">
+        <div className="relative aspect-[16/10] overflow-hidden bg-orbit-soft">
+          {media ? (
+            <img
+              src={media.url}
+              alt={media.alt || listing.title}
+              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
+            />
+          ) : null}
+          <span className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full bg-orbit-panel/85 px-2.5 py-1 text-xs font-black text-orbit-ink backdrop-blur">
+            <Star className="h-3.5 w-3.5 fill-[#EFBF04] text-[#EFBF04]" aria-hidden="true" />
+            {listing.rating.toFixed(1)}
+          </span>
+          <span className="kind-tag absolute right-3 top-3 rounded-full px-[9px] py-[3px] text-[10px] font-black uppercase tracking-[0.08em]" data-kind={listing.kind}>
+            {listingKindLabel(listing.kind)}
+          </span>
+        </div>
+      </button>
+
+      <div className="p-4">
+        <p className="text-[11px] font-black uppercase text-[#705d00]">{listingKindLabel(listing.kind)}</p>
+        <h4 className="mt-1 truncate text-sm font-black text-orbit-ink">{listing.title}</h4>
+        <p className="mt-1 truncate text-xs font-semibold text-orbit-ink/58">
+          {listing.location.generalArea}, {listing.location.county}
+        </p>
+
+        <div className="mt-4 flex items-end justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-[10px] font-black uppercase text-orbit-ink/50">{rateLabel}</p>
+            <p className="mt-1 truncate text-lg font-black text-orbit-ink">{kes(rate)}</p>
+          </div>
+          <div className="flex shrink-0 gap-2">
+            <button
+              type="button"
+              onClick={onSave}
+              className={`flex h-10 w-10 items-center justify-center rounded-full transition-colors ${
+                saved ? "bg-[#EFBF04] text-[#403301]" : "bg-orbit-field text-orbit-ink"
+              }`}
+              title={saved ? "Saved" : "Save item"}
+            >
+              <Heart className={`h-4 w-4 ${saved ? "fill-current" : ""}`} aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              onClick={onOpen}
+              className="orbit-cta-gold flex h-10 w-10 items-center justify-center rounded-full"
+              title="Open listing"
+            >
+              <ChevronRight className="h-5 w-5" aria-hidden="true" />
+            </button>
+          </div>
+        </div>
+      </div>
+    </article>
   );
 }
 
@@ -794,19 +1084,19 @@ function DiscoveryPanel({
     <section className="theme-body-border m-[2px] max-h-full min-w-0 overflow-y-auto overflow-x-hidden rounded-[36px] bg-orbit-panel/92 p-5 ring-1 ring-white/70">
       <div className="mb-4 flex items-center justify-between">
         <h2 className="text-base font-bold">Discovery</h2>
-        <button className="rounded-full border border-orbit-line p-2 text-orbit-green" title="Filter listings">
+        <button className="rounded-full bg-orbit-field p-2 text-orbit-green" title="Filter listings">
           <Filter className="h-4 w-4" aria-hidden="true" />
         </button>
       </div>
 
       <label className="mb-3 block">
         <span className="mb-1 block text-xs font-semibold uppercase text-neutral-500">Search</span>
-        <div className="flex items-center gap-2 rounded-[18px] border border-orbit-line bg-orbit-field px-3 py-2 focus-within:border-orbit-line focus-within:outline-none focus-within:ring-0">
-          <Search className="h-4 w-4 shrink-0 text-neutral-500" aria-hidden="true" />
+        <div className="theme-body-border flex min-h-14 items-center gap-2 rounded-full bg-orbit-panel p-2 shadow-[0_2px_14px_rgba(25,32,29,0.08)] transition-colors focus-within:outline-none focus-within:ring-0">
+          <Search className="ml-2 h-5 w-5 shrink-0 text-orbit-ink/55" aria-hidden="true" />
           <input
             value={filters.query}
             onChange={(event) => patchFilters({ query: event.target.value })}
-            className="min-w-0 flex-1 border-0 bg-transparent p-0 text-sm outline-none ring-0 focus:border-transparent focus:outline-none focus:ring-0 focus-visible:outline-none"
+            className="min-w-0 flex-1 bg-transparent px-1 text-sm font-semibold text-orbit-ink outline-none placeholder:text-orbit-ink/45 focus:outline-none focus:ring-0 focus-visible:outline-none"
             style={{ outline: "none" }}
             placeholder="camera, crew, generator"
           />
@@ -846,7 +1136,7 @@ function DiscoveryPanel({
           ]}
         />
 
-        <label className="block rounded-[18px] border border-orbit-line bg-orbit-field px-3 py-2">
+        <label className="block rounded-[18px] bg-orbit-field px-3 py-2 shadow-[inset_0_0_0_1px_rgb(255_255_255_/_0.18)]">
           <span className="mb-1 block text-xs font-semibold uppercase text-neutral-500">Radius</span>
           <input
             type="range"
@@ -860,7 +1150,7 @@ function DiscoveryPanel({
           <span className="text-sm font-semibold">{filters.radiusKm} km</span>
         </label>
 
-        <label className="flex items-center gap-3 rounded-[18px] border border-orbit-line bg-orbit-field px-3 py-2 text-sm">
+        <label className="flex items-center gap-3 rounded-[18px] bg-orbit-field px-3 py-2 text-sm shadow-[inset_0_0_0_1px_rgb(255_255_255_/_0.18)]">
           <input
             type="checkbox"
             checked={filters.includeCountrywide}
@@ -919,7 +1209,7 @@ function ListingDetailsPanel({
   bookedUnits,
   availableUnits,
   setSelectedMode,
-  setChatLines,
+  onDm,
   proposeBooking
 }: {
   selectedListing: ResourceListing;
@@ -933,7 +1223,57 @@ function ListingDetailsPanel({
   bookedUnits: number;
   availableUnits: number;
   setSelectedMode: (mode: OperationMode) => void;
-  setChatLines: React.Dispatch<React.SetStateAction<ChatLine[]>>;
+  onDm: (listing: ResourceListing) => void;
+  proposeBooking: () => void;
+}) {
+  return (
+    <section className="theme-body-border m-[2px] max-h-full min-w-0 overflow-y-auto overflow-x-hidden rounded-[36px] bg-orbit-panel/92 p-5 ring-1 ring-white/70">
+      <BookingDetailsContent
+        listing={selectedListing}
+        publicCoordinates={selectedPublicCoordinates}
+        activeMode={activeMode}
+        quote={quote}
+        bookingQuantity={bookingQuantity}
+        setBookingQuantity={setBookingQuantity}
+        selectedQuantity={selectedQuantity}
+        totalUnits={totalUnits}
+        bookedUnits={bookedUnits}
+        availableUnits={availableUnits}
+        setSelectedMode={setSelectedMode}
+        onDm={() => onDm(selectedListing)}
+        proposeBooking={proposeBooking}
+      />
+    </section>
+  );
+}
+
+function BookingDetailsContent({
+  listing,
+  publicCoordinates,
+  activeMode,
+  quote,
+  bookingQuantity,
+  setBookingQuantity,
+  selectedQuantity,
+  totalUnits,
+  bookedUnits,
+  availableUnits,
+  setSelectedMode,
+  onDm,
+  proposeBooking
+}: {
+  listing: ResourceListing;
+  publicCoordinates?: Coordinates;
+  activeMode: OperationMode;
+  quote: ReturnType<typeof calculateBookingQuote>;
+  bookingQuantity: string;
+  setBookingQuantity: (value: string) => void;
+  selectedQuantity: number;
+  totalUnits: number;
+  bookedUnits: number;
+  availableUnits: number;
+  setSelectedMode: (mode: OperationMode) => void;
+  onDm: () => void;
   proposeBooking: () => void;
 }) {
   const totalRental = quote.rentalFee.amount * selectedQuantity;
@@ -942,122 +1282,164 @@ function ListingDetailsPanel({
   const totalDueNow = quote.totalDueNow.amount * selectedQuantity;
 
   return (
-    <section className="theme-body-border m-[2px] max-h-full min-w-0 overflow-y-auto overflow-x-hidden rounded-[36px] bg-orbit-panel/92 p-5 ring-1 ring-white/70">
-      <img
-        src={selectedListing.media[0]?.url}
-        alt={selectedListing.media[0]?.alt ?? selectedListing.title}
-        className="aspect-[16/8] w-full rounded-[28px] object-cover"
-      />
-      <div className="grid gap-4 pt-4">
-        <div>
-          <div className="flex flex-wrap gap-2 text-xs font-bold">
-            <span className="orbit-tag rounded-full bg-orbit-field px-3 py-1">{selectedListing.location.county}</span>
-            <span className="orbit-tag rounded-full bg-orbit-field px-3 py-1">{selectedListing.category}</span>
-            <span className="kind-tag orbit-tag rounded-full px-3 py-1" data-kind={selectedListing.kind}>
-              {listingKindLabel(selectedListing.kind)}
-            </span>
-            <span className="orbit-tag rounded-full bg-orbit-field px-3 py-1">{bookedUnitsLabel(bookedUnits, totalUnits)}</span>
-          </div>
-          <h2 className="mt-3 text-xl font-black">{selectedListing.title}</h2>
-          <p className="mt-2 text-sm leading-6 text-neutral-600">{selectedListing.description}</p>
+    <div className="grid gap-5">
+      <div>
+        <div className="flex flex-wrap items-center gap-2 text-[10px] font-black uppercase tracking-[0.04em]">
+          <span className="orbit-tag rounded-full bg-orbit-soft px-[15px] py-[7px]">{listing.location.county}</span>
+          <span className="orbit-tag rounded-full bg-orbit-soft px-[15px] py-[7px]">{listing.category}</span>
+          <span className="kind-tag orbit-tag rounded-full px-[15px] py-[7px]" data-kind={listing.kind}>
+            {listingKindLabel(listing.kind)}
+          </span>
+          <span className="orbit-tag ml-auto inline-flex min-h-9 shrink-0 items-center justify-center whitespace-nowrap rounded-full bg-orbit-soft px-[15px] py-[7px] text-orbit-ink">
+            {bookedUnitsLabel(bookedUnits, totalUnits)}
+          </span>
         </div>
-
-        <div className="rounded-[28px] bg-orbit-soft/75 p-3">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <h3 className="text-base font-black">Approximate</h3>
-              <p className="mt-1 text-xs font-semibold text-neutral-600">
-                {selectedListing.location.generalArea}, {selectedListing.location.county}
-              </p>
-            </div>
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/70 text-orbit-green">
-              <MapPin className="h-5 w-5" aria-hidden="true" />
-            </span>
-          </div>
-          <div className="relative mt-3 h-36 overflow-hidden rounded-[26px] bg-orbit-line">
-            <div className="absolute inset-0 opacity-60 [background-image:linear-gradient(rgba(255,255,255,0.55)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.55)_1px,transparent_1px)] [background-size:28px_28px]" />
-            <div className="absolute left-[18%] top-[24%] h-20 w-20 rounded-full border border-white/70 bg-white/20" />
-            <div className="absolute bottom-[12%] right-[14%] h-24 w-24 rounded-full border border-white/60 bg-white/15" />
-            <span className="absolute left-1/2 top-1/2 flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-orbit-green text-orbit-field shadow-panel">
-              <MapPin className="h-6 w-6" aria-hidden="true" />
-            </span>
-          </div>
-          <p className="mt-3 text-xs font-semibold text-neutral-600">
-            {selectedPublicCoordinates
-              ? `${selectedPublicCoordinates.latitude}, ${selectedPublicCoordinates.longitude}`
-              : "Approximate public area only"}
-          </p>
+        <div className="mt-4 grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
+          <h2 className="min-w-0 text-[clamp(1.45rem,2vw,1.85rem)] font-black leading-tight text-orbit-ink">{listing.title}</h2>
+          <span className="inline-flex h-10 shrink-0 items-center gap-1 rounded-[12px] bg-orbit-soft px-3 text-sm font-black text-orbit-ink">
+            <Star className="h-4 w-4 fill-[#806A00] text-[#806A00]" aria-hidden="true" />
+            {listing.rating.toFixed(1)}
+          </span>
         </div>
+        <p className="mt-4 text-[clamp(0.95rem,1.2vw,1.08rem)] font-medium leading-7 text-[#403301] dark:text-orbit-ink/70">{listing.description}</p>
+      </div>
 
-        <div className="rounded-[24px] border border-orbit-line bg-orbit-field p-4">
-          <p className="text-xs font-black uppercase text-orbit-ink/55">Booking mode</p>
-          <div className="mt-3 grid min-w-0 grid-cols-3 gap-2">
-            {selectedListing.modeRules.map((rule) => (
-              <button
-                key={rule.mode}
-                onClick={() => setSelectedMode(rule.mode)}
-                className={`min-w-0 min-h-14 rounded-[18px] border px-2 py-2 text-xs font-bold leading-tight ${
-                  activeMode === rule.mode
-                    ? "border-orbit-green bg-orbit-soft text-orbit-green"
-                    : "border-orbit-line bg-orbit-panel text-orbit-ink"
-                }`}
-                title={rule.label}
-              >
-                {readableMode(rule.mode)}
-              </button>
-            ))}
-          </div>
-        </div>
+      <ApproximateLocationPanel listing={listing} publicCoordinates={publicCoordinates} />
 
-        <BookingQuantityControl
-          quantityValue={bookingQuantity}
-          setQuantityValue={setBookingQuantity}
-          selectedQuantity={selectedQuantity}
-          totalUnits={totalUnits}
-          bookedUnits={bookedUnits}
-          availableUnits={availableUnits}
-        />
-
-        <div className="grid grid-cols-2 gap-2 border-y border-orbit-line py-3 text-sm">
-          <SummaryLine label="Rental" value={kes(totalRental)} />
-          <SummaryLine label="Platform" value={kes(totalPlatform)} />
-          <SummaryLine label="Deposit" value={kes(totalDeposit)} />
-          <SummaryLine label="Due now" value={kes(totalDueNow)} strong />
-        </div>
-
-        <div className="grid grid-cols-2 gap-2 text-sm">
-          <IconFact icon={<Truck className="h-4 w-4" />} label={selectedListing.logistics.deliveryModes.join(", ")} />
-          <IconFact icon={<CalendarClock className="h-4 w-4" />} label={`${selectedQuantity} item(s), ${quote.units} billed unit(s)`} />
-        </div>
-
-        <div className="grid grid-cols-2 gap-2">
-          <button
-            onClick={() =>
-              setChatLines((current) => [
-                ...current,
-                {
-                  id: `msg_${Date.now()}`,
-                  from: "renter",
-                  text: `Can we proceed with ${readableMode(activeMode)} for ${selectedListing.title}?`
-                }
-              ])
-            }
-            className="inline-flex items-center justify-center gap-2 rounded-full border border-orbit-line px-3 py-3 text-sm font-bold"
-          >
-            <MessageCircle className="h-4 w-4" aria-hidden="true" />
-            DM
-          </button>
-          <button
-            onClick={proposeBooking}
-            disabled={availableUnits <= 0}
-            className="inline-flex items-center justify-center gap-2 rounded-full bg-orbit-green px-3 py-3 text-sm font-bold text-orbit-field disabled:cursor-not-allowed disabled:grayscale disabled:opacity-45"
-          >
-            <FileSignature className="h-4 w-4" aria-hidden="true" />
-            Propose
-          </button>
+      <div>
+        <p className="mb-3 text-xs font-black uppercase tracking-[0.06em] text-[#403301] dark:text-orbit-ink/65">Booking mode</p>
+        <div className="grid min-w-0 gap-3 sm:grid-cols-2">
+          {listing.modeRules.map((rule) => (
+            <button
+              key={rule.mode}
+              type="button"
+              onClick={() => setSelectedMode(rule.mode)}
+              className={`min-h-16 rounded-[16px] px-4 py-3 text-sm font-black leading-tight transition-colors ${
+                activeMode === rule.mode
+                  ? "border-2 border-[#806A00] bg-orbit-panel text-[#806A00]"
+                  : "border border-[#806A00]/32 bg-orbit-panel text-orbit-ink"
+              }`}
+              title={rule.label}
+            >
+              {readableMode(rule.mode)}
+            </button>
+          ))}
         </div>
       </div>
-    </section>
+
+      <BookingQuantityControl
+        quantityValue={bookingQuantity}
+        setQuantityValue={setBookingQuantity}
+        selectedQuantity={selectedQuantity}
+        totalUnits={totalUnits}
+        bookedUnits={bookedUnits}
+        availableUnits={availableUnits}
+      />
+
+      <BillingPanel
+        listing={listing}
+        quote={quote}
+        selectedQuantity={selectedQuantity}
+        rental={totalRental}
+        platform={totalPlatform}
+        deposit={totalDeposit}
+        dueNow={totalDueNow}
+      />
+
+      <div className="grid grid-cols-2 gap-3">
+        <button
+          type="button"
+          onClick={onDm}
+          className="inline-flex min-h-16 items-center justify-center gap-2 rounded-full border border-orbit-line bg-orbit-panel px-4 text-base font-black text-orbit-ink"
+        >
+          <MessageCircle className="h-5 w-5" aria-hidden="true" />
+          DM
+        </button>
+        <button
+          type="button"
+          onClick={proposeBooking}
+          disabled={availableUnits <= 0}
+          className="orbit-cta-gold inline-flex min-h-16 items-center justify-center gap-2 rounded-full px-4 text-base font-black shadow-[0_14px_28px_rgba(239,191,4,0.2)]"
+        >
+          <FileSignature className="h-5 w-5" aria-hidden="true" />
+          Propose
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function ApproximateLocationPanel({
+  listing,
+  publicCoordinates
+}: {
+  listing: ResourceListing;
+  publicCoordinates?: Coordinates;
+}) {
+  return (
+    <div className="marketplace-detail-surface rounded-[18px] p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-black uppercase tracking-[0.06em] text-[#403301] dark:text-orbit-ink/65">Approximate location</p>
+          <p className="mt-1 text-sm font-black text-orbit-ink">
+            {listing.location.generalArea}, {listing.location.county}
+          </p>
+        </div>
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-orbit-panel text-[#806A00] shadow-[0_8px_22px_rgba(25,32,29,0.1)]">
+          <MapPin className="h-5 w-5" aria-hidden="true" />
+        </span>
+      </div>
+      <div className="marketplace-map-surface relative mt-4 h-36 overflow-hidden rounded-[14px]">
+        <div className="absolute inset-0 opacity-70 [background-image:radial-gradient(circle,rgb(128_106_0_/_0.22)_1px,transparent_1.5px)] [background-size:18px_18px]" />
+        <div className="absolute left-[14%] top-[20%] h-20 w-28 rounded-full border border-white/45 bg-white/20" />
+        <div className="absolute bottom-[10%] right-[10%] h-24 w-32 rounded-full border border-white/35 bg-white/15" />
+        <span className="absolute left-1/2 top-1/2 flex h-11 w-11 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-orbit-panel shadow-[0_8px_22px_rgba(25,32,29,0.16)]">
+          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#806A00]" />
+        </span>
+        <span className="absolute bottom-3 left-4 rounded-full bg-orbit-panel/70 px-2 py-1 text-[10px] font-mono text-orbit-ink/75 backdrop-blur">
+          {publicCoordinates ? `${publicCoordinates.latitude}, ${publicCoordinates.longitude}` : "Approximate area"}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function BillingPanel({
+  listing,
+  quote,
+  selectedQuantity,
+  rental,
+  platform,
+  deposit,
+  dueNow
+}: {
+  listing: ResourceListing;
+  quote: ReturnType<typeof calculateBookingQuote>;
+  selectedQuantity: number;
+  rental: number;
+  platform: number;
+  deposit: number;
+  dueNow: number;
+}) {
+  return (
+    <div className="marketplace-detail-surface rounded-[22px] p-5">
+      <div className="grid grid-cols-2 gap-x-6 gap-y-5">
+        <SummaryLine label="Rental" value={kes(rental)} />
+        <SummaryLine label="Platform" value={kes(platform)} />
+        <SummaryLine label="Deposit" value={kes(deposit)} />
+        <SummaryLine label="Due now" value={kes(dueNow)} strong />
+      </div>
+      <div className="mt-5 grid gap-2 border-t border-[#403301]/10 pt-4 text-sm font-black text-[#403301] dark:border-white/10 dark:text-orbit-ink/75">
+        <div className="flex items-center gap-2">
+          <Truck className="h-4 w-4 shrink-0" aria-hidden="true" />
+          <span>{listing.logistics.deliveryModes.join(", ")} available</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <CalendarClock className="h-4 w-4 shrink-0" aria-hidden="true" />
+          <span>{selectedQuantity} item(s), {quote.units} billed unit(s)</span>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -1138,89 +1520,88 @@ function FocusedListingOverlay({
   }
 
   return (
-    <div className="fixed inset-0 z-[80] bg-orbit-field p-2 text-orbit-ink sm:p-3" role="dialog" aria-modal="true" aria-label={listing.title}>
-      <div className="grid h-full min-w-0 overflow-hidden rounded-[34px] border-2 border-[#4391F5] bg-orbit-panel shadow-[0_24px_70px_rgba(25,32,29,0.22)] lg:grid-cols-[minmax(0,7fr)_minmax(340px,3fr)]">
-        <section className="relative min-h-[55svh] overflow-hidden bg-[#1A1A1A] lg:min-h-0">
-          <div className="absolute left-4 top-4 z-20 flex items-center gap-2 rounded-full bg-black/65 p-1 text-white backdrop-blur">
+    <div className="fixed inset-0 z-[80] bg-orbit-field p-3 text-orbit-ink sm:p-5" role="dialog" aria-modal="true" aria-label={listing.title}>
+      <div className="relative grid h-full min-w-0 overflow-hidden rounded-[34px] border-2 border-[#4391F5] bg-orbit-panel shadow-[0_24px_70px_rgba(25,32,29,0.18)] lg:grid-cols-[minmax(0,65fr)_minmax(0,35fr)]">
+          <section className="relative min-h-[52svh] overflow-hidden bg-orbit-field p-5 sm:p-8 lg:min-h-0">
             <button
               type="button"
               onClick={onClose}
-              className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20"
+              className="absolute left-5 top-5 z-30 flex h-16 w-16 items-center justify-center rounded-full bg-orbit-panel text-orbit-ink shadow-[0_12px_30px_rgba(25,32,29,0.18)] transition-colors hover:bg-orbit-soft"
               title="Close"
             >
-              <X className="h-5 w-5" aria-hidden="true" />
+              <X className="h-8 w-8" aria-hidden="true" />
               <span className="sr-only">Close focused listing</span>
             </button>
-            <span className="max-w-[42vw] truncate pr-3 text-sm font-black">{listing.title}</span>
-          </div>
 
-          <div className="flex h-full w-full items-center justify-center overflow-hidden">
-            {image ? (
-              <img
-                src={image.url}
-                alt={image.alt || listing.title}
-                className="h-full w-full object-contain transition-transform duration-200 ease-out"
-                style={{ transform: `scale(${zoom})`, transformOrigin: "center center" }}
-              />
-            ) : null}
-          </div>
+            <div className="flex h-full w-full items-center justify-center overflow-hidden rounded-[26px] bg-orbit-field">
+              {image ? (
+                <img
+                  src={image.url}
+                  alt={image.alt || listing.title}
+                  className="max-h-full max-w-full select-none object-contain transition-transform duration-200 ease-out"
+                  style={{ transform: `scale(${zoom})`, transformOrigin: "center center" }}
+                />
+              ) : null}
+            </div>
 
-          <div className="absolute bottom-5 left-5 z-20 flex rounded-[18px] bg-black p-1 text-white shadow-[0_12px_30px_rgba(0,0,0,0.28)]">
-            <button
-              type="button"
-              onClick={() => shiftImage("previous")}
-              disabled={!hasMultipleImages}
-              className="flex h-12 w-12 items-center justify-center rounded-[14px] disabled:cursor-not-allowed disabled:opacity-35"
-              title="Previous image"
-            >
-              <ChevronLeft className="h-6 w-6" aria-hidden="true" />
-              <span className="sr-only">Previous image</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => shiftImage("next")}
-              disabled={!hasMultipleImages}
-              className="flex h-12 w-12 items-center justify-center rounded-[14px] disabled:cursor-not-allowed disabled:opacity-35"
-              title="Next image"
-            >
-              <ChevronRight className="h-6 w-6" aria-hidden="true" />
-              <span className="sr-only">Next image</span>
-            </button>
-          </div>
+            <div className="absolute bottom-8 right-8 z-20 flex flex-wrap justify-end gap-3">
+              <div className="flex h-12 items-center rounded-[14px] bg-orbit-panel p-1 text-orbit-ink shadow-[0_10px_24px_rgba(25,32,29,0.12)]">
+                <button
+                  type="button"
+                  onClick={() => updateZoom(zoom - 0.2)}
+                  disabled={zoom <= 1}
+                  className="flex h-10 w-10 items-center justify-center rounded-[10px] disabled:cursor-not-allowed disabled:opacity-35"
+                  title="Zoom out"
+                >
+                  <ZoomOut className="h-4 w-4" aria-hidden="true" />
+                  <span className="sr-only">Zoom out</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => updateZoom(zoom + 0.2)}
+                  disabled={zoom >= 2.5}
+                  className="flex h-10 w-10 items-center justify-center rounded-[10px] disabled:cursor-not-allowed disabled:opacity-35"
+                  title="Zoom in"
+                >
+                  <ZoomIn className="h-4 w-4" aria-hidden="true" />
+                  <span className="sr-only">Zoom in</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setZoom(1)}
+                  className="h-10 rounded-[10px] px-3 text-xs font-black"
+                  title="Reset zoom"
+                >
+                  {Math.round(zoom * 100)}%
+                </button>
+              </div>
 
-          <div className="absolute bottom-5 right-5 z-20 flex rounded-[18px] bg-black p-1 text-white shadow-[0_12px_30px_rgba(0,0,0,0.28)]">
-            <button
-              type="button"
-              onClick={() => updateZoom(zoom - 0.2)}
-              disabled={zoom <= 1}
-              className="flex h-12 w-12 items-center justify-center rounded-[14px] disabled:cursor-not-allowed disabled:opacity-35"
-              title="Zoom out"
-            >
-              <ZoomOut className="h-5 w-5" aria-hidden="true" />
-              <span className="sr-only">Zoom out</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => updateZoom(zoom + 0.2)}
-              disabled={zoom >= 2.5}
-              className="flex h-12 w-12 items-center justify-center rounded-[14px] disabled:cursor-not-allowed disabled:opacity-35"
-              title="Zoom in"
-            >
-              <ZoomIn className="h-5 w-5" aria-hidden="true" />
-              <span className="sr-only">Zoom in</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setZoom(1)}
-              className="hidden h-12 items-center justify-center rounded-[14px] px-3 text-xs font-black sm:flex"
-              title="Reset zoom"
-            >
-              {Math.round(zoom * 100)}%
-            </button>
-          </div>
-        </section>
+              <div className="flex h-12 items-center rounded-[14px] bg-orbit-panel p-1 text-orbit-ink shadow-[0_10px_24px_rgba(25,32,29,0.12)]">
+                <button
+                  type="button"
+                  onClick={() => shiftImage("previous")}
+                  disabled={!hasMultipleImages}
+                  className="flex h-10 w-10 items-center justify-center rounded-[10px] disabled:cursor-not-allowed disabled:opacity-35"
+                  title="Previous image"
+                >
+                  <ChevronLeft className="h-5 w-5" aria-hidden="true" />
+                  <span className="sr-only">Previous image</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => shiftImage("next")}
+                  disabled={!hasMultipleImages}
+                  className="flex h-10 w-10 items-center justify-center rounded-[10px] disabled:cursor-not-allowed disabled:opacity-35"
+                  title="Next image"
+                >
+                  <ChevronRight className="h-5 w-5" aria-hidden="true" />
+                  <span className="sr-only">Next image</span>
+                </button>
+              </div>
+            </div>
+          </section>
 
-        <aside className="min-h-0 min-w-0 overflow-hidden bg-orbit-panel">
+          <aside className="min-h-0 min-w-0 overflow-hidden bg-orbit-panel">
           {panel === "details" ? (
             <FocusedDetailsPanel
               listing={listing}
@@ -1246,7 +1627,7 @@ function FocusedListingOverlay({
               backToDetails={() => setPanel("details")}
             />
           )}
-        </aside>
+          </aside>
       </div>
     </div>
   );
@@ -1281,109 +1662,23 @@ function FocusedDetailsPanel({
   onDm: () => void;
   proposeBooking: () => void;
 }) {
-  const totalRental = quote.rentalFee.amount * selectedQuantity;
-  const totalPlatform = quote.platformFee.amount * selectedQuantity;
-  const totalDeposit = quote.deposit.amount * selectedQuantity;
-  const totalDueNow = quote.totalDueNow.amount * selectedQuantity;
-
   return (
-    <section className="grid h-full min-h-0 min-w-0 content-start gap-4 overflow-y-auto overflow-x-hidden p-4">
-      <div>
-        <div className="flex flex-wrap gap-2 text-xs font-bold">
-          <span className="orbit-tag rounded-full bg-orbit-field px-3 py-1">{listing.location.county}</span>
-          <span className="orbit-tag rounded-full bg-orbit-field px-3 py-1">{listing.category}</span>
-          <span className="kind-tag orbit-tag rounded-full px-3 py-1" data-kind={listing.kind}>
-            {listingKindLabel(listing.kind)}
-          </span>
-          <span className="orbit-tag rounded-full bg-orbit-field px-3 py-1">{bookedUnitsLabel(bookedUnits, totalUnits)}</span>
-        </div>
-        <h2 className="mt-4 text-2xl font-black">{listing.title}</h2>
-        <p className="mt-2 text-sm leading-6 text-neutral-600">{listing.description}</p>
-      </div>
-
-      <div className="rounded-[28px] bg-orbit-soft/75 p-3">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h3 className="text-base font-black">Approximate</h3>
-            <p className="mt-1 text-xs font-semibold text-neutral-600">
-              {listing.location.generalArea}, {listing.location.county}
-            </p>
-          </div>
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/70 text-orbit-green">
-            <MapPin className="h-5 w-5" aria-hidden="true" />
-          </span>
-        </div>
-        <div className="relative mt-3 h-36 overflow-hidden rounded-[26px] bg-orbit-line">
-          <div className="absolute inset-0 opacity-60 [background-image:linear-gradient(rgba(255,255,255,0.55)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.55)_1px,transparent_1px)] [background-size:28px_28px]" />
-          <div className="absolute left-[18%] top-[24%] h-20 w-20 rounded-full border border-white/70 bg-white/20" />
-          <div className="absolute bottom-[12%] right-[14%] h-24 w-24 rounded-full border border-white/60 bg-white/15" />
-          <span className="absolute left-1/2 top-1/2 flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-orbit-green text-orbit-field shadow-panel">
-            <MapPin className="h-6 w-6" aria-hidden="true" />
-          </span>
-        </div>
-        <p className="mt-3 text-xs font-semibold text-neutral-600">
-          {publicCoordinates ? `${publicCoordinates.latitude}, ${publicCoordinates.longitude}` : "Approximate public area only"}
-        </p>
-      </div>
-
-      <div className="rounded-[24px] border border-orbit-line bg-orbit-field p-4">
-        <p className="text-xs font-black uppercase text-orbit-ink/55">Booking mode</p>
-        <div className="mt-3 grid min-w-0 grid-cols-3 gap-2">
-          {listing.modeRules.map((rule) => (
-            <button
-              key={rule.mode}
-              onClick={() => setSelectedMode(rule.mode)}
-              className={`min-w-0 min-h-14 rounded-[18px] border px-2 py-2 text-xs font-bold leading-tight ${
-                activeMode === rule.mode
-                  ? "border-[#4391F5] bg-orbit-soft text-orbit-green"
-                  : "border-orbit-line bg-orbit-panel text-orbit-ink"
-              }`}
-              title={rule.label}
-            >
-              {readableMode(rule.mode)}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <BookingQuantityControl
-        quantityValue={bookingQuantity}
-        setQuantityValue={setBookingQuantity}
+    <section className="h-full min-h-0 min-w-0 overflow-y-auto overflow-x-hidden p-5">
+      <BookingDetailsContent
+        listing={listing}
+        publicCoordinates={publicCoordinates}
+        activeMode={activeMode}
+        quote={quote}
+        bookingQuantity={bookingQuantity}
+        setBookingQuantity={setBookingQuantity}
         selectedQuantity={selectedQuantity}
         totalUnits={totalUnits}
         bookedUnits={bookedUnits}
         availableUnits={availableUnits}
+        setSelectedMode={setSelectedMode}
+        onDm={onDm}
+        proposeBooking={proposeBooking}
       />
-
-      <div className="grid grid-cols-2 gap-2 border-y border-orbit-line py-3 text-sm">
-        <SummaryLine label="Rental" value={kes(totalRental)} />
-        <SummaryLine label="Platform" value={kes(totalPlatform)} />
-        <SummaryLine label="Deposit" value={kes(totalDeposit)} />
-        <SummaryLine label="Due now" value={kes(totalDueNow)} strong />
-      </div>
-
-      <div className="grid grid-cols-2 gap-2 text-sm">
-        <IconFact icon={<Truck className="h-4 w-4" />} label={listing.logistics.deliveryModes.join(", ")} />
-        <IconFact icon={<CalendarClock className="h-4 w-4" />} label={`${selectedQuantity} item(s), ${quote.units} billed unit(s)`} />
-      </div>
-
-      <div className="grid grid-cols-2 gap-2">
-        <button
-          onClick={onDm}
-          className="inline-flex items-center justify-center gap-2 rounded-full border border-orbit-line px-3 py-3 text-sm font-bold"
-        >
-          <MessageCircle className="h-4 w-4" aria-hidden="true" />
-          DM
-        </button>
-        <button
-          onClick={proposeBooking}
-          disabled={availableUnits <= 0}
-          className="inline-flex items-center justify-center gap-2 rounded-full bg-orbit-green px-3 py-3 text-sm font-bold text-orbit-field disabled:cursor-not-allowed disabled:grayscale disabled:opacity-45"
-        >
-          <FileSignature className="h-4 w-4" aria-hidden="true" />
-          Propose
-        </button>
-      </div>
     </section>
   );
 }
@@ -1411,9 +1706,9 @@ function FocusedChatPanel({
         <button
           type="button"
           onClick={backToDetails}
-          className="rounded-full bg-orbit-soft px-4 py-2 text-xs font-black"
+          className="rounded-full bg-orbit-clay px-4 py-2 text-xs font-black text-orbit-field transition-colors hover:opacity-90 dark:text-[#1a1a1a]"
         >
-          Details
+          Exit Chat
         </button>
       </div>
 
@@ -1434,7 +1729,7 @@ function FocusedChatPanel({
       </div>
 
       <div className="theme-body-border border-t border-white/70 bg-orbit-panel p-4">
-        <div className="flex items-center gap-2 rounded-full border border-orbit-line bg-orbit-field p-[3px] focus-within:border-orbit-line focus-within:outline-none focus-within:ring-0">
+        <div className="flex items-center gap-2 rounded-full bg-orbit-field p-[3px] shadow-[inset_0_0_0_1px_rgb(255_255_255_/_0.18)] focus-within:outline-none focus-within:ring-0">
           <textarea
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
@@ -1445,7 +1740,7 @@ function FocusedChatPanel({
             type="button"
             onClick={sendMessage}
             disabled={!draft.trim()}
-            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-orbit-green text-orbit-field disabled:cursor-not-allowed disabled:grayscale disabled:opacity-45"
+            className="orbit-cta-gold flex h-12 w-12 shrink-0 items-center justify-center rounded-full"
             title="Send message"
           >
             <Send className="h-5 w-5" aria-hidden="true" />
@@ -1474,22 +1769,300 @@ function FilterSelect({
       onChange={onChange}
       options={options}
       labelClassName="mb-1 block text-xs font-semibold uppercase text-neutral-500"
-      buttonClassName="flex min-h-10 w-full items-center gap-3 rounded-[18px] border border-orbit-line bg-orbit-panel py-2 pl-3 pr-2 text-left text-sm text-orbit-ink outline-none transition hover:bg-orbit-soft/45 focus:border-orbit-line focus:outline-none focus:ring-0 focus-visible:outline-none"
+      buttonClassName="flex min-h-10 w-full items-center gap-3 rounded-[18px] bg-orbit-panel py-2 pl-3 pr-2 text-left text-sm text-orbit-ink outline-none shadow-[inset_0_0_0_1px_rgb(255_255_255_/_0.22)] transition hover:bg-orbit-soft/45 focus:outline-none focus:ring-0 focus-visible:outline-none"
     />
   );
 }
 
-function DateInput({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+const monthLabels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const weekdayLabels = ["S", "M", "T", "W", "T", "F", "S"];
+
+function padDatePart(value: number) {
+  return String(value).padStart(2, "0");
+}
+
+function parseDateTimeValue(value: string) {
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/);
+
+  if (!match) {
+    return new Date();
+  }
+
+  const [, year, month, day, hour, minute] = match;
+  return new Date(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute));
+}
+
+function formatDateTimeValue(date: Date) {
+  return [
+    date.getFullYear(),
+    padDatePart(date.getMonth() + 1),
+    padDatePart(date.getDate())
+  ].join("-") + `T${padDatePart(date.getHours())}:${padDatePart(date.getMinutes())}`;
+}
+
+function dateTimeValueToMs(value: string) {
+  const parsed = parseDateTimeValue(value).getTime();
+  return Number.isNaN(parsed) ? null : parsed;
+}
+
+function normalizeFilterWindow(current: FilterState, next: Partial<FilterState>): FilterState {
+  const merged = { ...current, ...next };
+  const startTime = dateTimeValueToMs(merged.start);
+  const endTime = dateTimeValueToMs(merged.end);
+
+  if (startTime === null || endTime === null || startTime < endTime) {
+    return merged;
+  }
+
+  if (next.end !== undefined && next.start === undefined) {
+    const adjustedStart = parseDateTimeValue(merged.end);
+    adjustedStart.setHours(adjustedStart.getHours() - 24);
+    return { ...merged, start: formatDateTimeValue(adjustedStart) };
+  }
+
+  const adjustedEnd = parseDateTimeValue(merged.start);
+  adjustedEnd.setHours(adjustedEnd.getHours() + 24);
+  return { ...merged, end: formatDateTimeValue(adjustedEnd) };
+}
+
+function formatDateTimeLabel(date: Date) {
+  const hour = date.getHours();
+  const displayHour = hour % 12 || 12;
+  const period = hour >= 12 ? "PM" : "AM";
+
+  return `${monthLabels[date.getMonth()]} ${padDatePart(date.getDate())}, ${date.getFullYear()}, ${padDatePart(displayHour)}:${padDatePart(date.getMinutes())} ${period}`;
+}
+
+function sameCalendarDay(left: Date, right: Date) {
   return (
-    <label className="block">
-      <span className="mb-1 block text-xs font-semibold uppercase text-neutral-500">{label}</span>
-      <input
-        type="datetime-local"
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="w-full rounded-[18px] border border-orbit-line bg-orbit-panel px-3 py-2 text-sm outline-none focus:border-orbit-line focus:outline-none focus:ring-0 focus-visible:outline-none"
-      />
-    </label>
+    left.getFullYear() === right.getFullYear() &&
+    left.getMonth() === right.getMonth() &&
+    left.getDate() === right.getDate()
+  );
+}
+
+function DateInput({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const selectedDate = useMemo(() => parseDateTimeValue(value), [value]);
+  const [viewDate, setViewDate] = useState(() => new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1));
+  const wrapperRef = useRef<HTMLDivElement | null>(null);
+  const buttonId = useId();
+  const menuId = useId();
+
+  useEffect(() => {
+    if (open) {
+      setViewDate(new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1));
+    }
+  }, [open, selectedDate]);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    function handlePointerDown(event: PointerEvent) {
+      if (!wrapperRef.current?.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setOpen(false);
+      }
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [open]);
+
+  const calendarDays = useMemo(() => {
+    const firstDay = new Date(viewDate.getFullYear(), viewDate.getMonth(), 1);
+    const gridStart = new Date(firstDay);
+    gridStart.setDate(firstDay.getDate() - firstDay.getDay());
+
+    return Array.from({ length: 42 }, (_, index) => {
+      const day = new Date(gridStart);
+      day.setDate(gridStart.getDate() + index);
+      return day;
+    });
+  }, [viewDate]);
+
+  function moveMonth(delta: number) {
+    setViewDate((current) => new Date(current.getFullYear(), current.getMonth() + delta, 1));
+  }
+
+  function selectDay(day: Date) {
+    onChange(formatDateTimeValue(new Date(day.getFullYear(), day.getMonth(), day.getDate(), selectedDate.getHours(), selectedDate.getMinutes())));
+    setViewDate(new Date(day.getFullYear(), day.getMonth(), 1));
+  }
+
+  function adjustHour(delta: number) {
+    const next = new Date(selectedDate);
+    next.setHours((selectedDate.getHours() + delta + 24) % 24);
+    onChange(formatDateTimeValue(next));
+  }
+
+  function adjustMinute(delta: number) {
+    const totalMinutes = selectedDate.getHours() * 60 + selectedDate.getMinutes();
+    const nextTotal = (totalMinutes + delta * 5 + 24 * 60) % (24 * 60);
+    const next = new Date(selectedDate);
+    next.setHours(Math.floor(nextTotal / 60), nextTotal % 60);
+    onChange(formatDateTimeValue(next));
+  }
+
+  function selectToday() {
+    const now = new Date();
+    onChange(formatDateTimeValue(new Date(now.getFullYear(), now.getMonth(), now.getDate(), selectedDate.getHours(), selectedDate.getMinutes())));
+    setViewDate(new Date(now.getFullYear(), now.getMonth(), 1));
+  }
+
+  return (
+    <div ref={wrapperRef} className="relative block">
+      <span id={`${buttonId}-label`} className="mb-1 block text-xs font-semibold uppercase text-neutral-500">
+        {label}
+      </span>
+      <button
+        id={buttonId}
+        type="button"
+        onClick={() => setOpen((current) => !current)}
+        className="flex min-h-10 w-full items-center gap-3 rounded-[18px] bg-orbit-panel py-2 pl-3 pr-2 text-left text-sm text-orbit-ink outline-none shadow-[inset_0_0_0_1px_rgb(255_255_255_/_0.22)] transition hover:bg-orbit-soft/45 focus:outline-none focus:ring-0 focus-visible:outline-none"
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        aria-controls={menuId}
+        aria-labelledby={`${buttonId}-label ${buttonId}`}
+      >
+        <span className="flex h-full aspect-square shrink-0 items-center justify-center rounded-full bg-orbit-field text-orbit-green">
+          <CalendarClock className="h-4 w-4" aria-hidden="true" />
+        </span>
+        <span className="min-w-0 flex-1 truncate">{formatDateTimeLabel(selectedDate)}</span>
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-orbit-panel/75 text-orbit-ink">
+          <ChevronDown className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`} aria-hidden="true" />
+        </span>
+      </button>
+
+      {open ? (
+        <div
+          id={menuId}
+          role="dialog"
+          aria-labelledby={`${buttonId}-label`}
+          className="absolute left-0 right-0 top-[calc(100%+8px)] z-[90] overflow-hidden rounded-[24px] bg-orbit-panel p-2 shadow-[0_18px_42px_rgba(25,32,29,0.14)]"
+        >
+          <div className="flex items-center justify-between gap-2 px-1 py-1">
+            <button
+              type="button"
+              onClick={() => moveMonth(-1)}
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-orbit-field text-orbit-ink transition-colors hover:bg-orbit-soft"
+              aria-label="Previous month"
+            >
+              <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+            </button>
+            <p className="text-sm font-black text-orbit-ink">
+              {monthLabels[viewDate.getMonth()]} {viewDate.getFullYear()}
+            </p>
+            <button
+              type="button"
+              onClick={() => moveMonth(1)}
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-orbit-field text-orbit-ink transition-colors hover:bg-orbit-soft"
+              aria-label="Next month"
+            >
+              <ChevronRight className="h-4 w-4" aria-hidden="true" />
+            </button>
+          </div>
+
+          <div className="mt-2 grid grid-cols-7 gap-1 px-1 text-center text-[11px] font-black uppercase text-orbit-ink/55">
+            {weekdayLabels.map((weekday, index) => (
+              <span key={`${weekday}-${index}`} className="py-1">
+                {weekday}
+              </span>
+            ))}
+          </div>
+
+          <div className="mt-1 grid grid-cols-7 gap-1">
+            {calendarDays.map((day) => {
+              const selected = sameCalendarDay(day, selectedDate);
+              const outsideMonth = day.getMonth() !== viewDate.getMonth();
+
+              return (
+                <button
+                  key={formatDateTimeValue(day)}
+                  type="button"
+                  onClick={() => selectDay(day)}
+                  className={`relative mx-auto flex h-9 w-9 items-center justify-center rounded-full text-xs font-black transition-colors ${
+                    selected ? "bg-[#EFBF04] text-[#1a1a1a] hover:bg-[#EFBF04]" : "bg-transparent text-orbit-ink hover:bg-orbit-field"
+                  } ${outsideMonth && !selected ? "opacity-35" : ""}`}
+                  aria-pressed={selected}
+                >
+                  {day.getDate()}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="mt-3 grid gap-2 rounded-[18px] bg-orbit-field p-2">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs font-black uppercase text-orbit-ink/55">Time</span>
+              <span className="rounded-full bg-orbit-panel px-3 py-1 text-xs font-black text-orbit-ink">
+                {formatDateTimeLabel(selectedDate).split(", ").at(-1)}
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <TimeStepper label="Hour" value={padDatePart(selectedDate.getHours())} onDecrement={() => adjustHour(-1)} onIncrement={() => adjustHour(1)} />
+              <TimeStepper label="Minute" value={padDatePart(selectedDate.getMinutes())} onDecrement={() => adjustMinute(-1)} onIncrement={() => adjustMinute(1)} />
+            </div>
+          </div>
+
+          <div className="mt-2 flex items-center justify-between gap-2">
+            <button
+              type="button"
+              onClick={selectToday}
+              className="flex min-h-10 items-center justify-center rounded-full bg-orbit-field px-4 text-xs font-black text-orbit-ink transition-colors hover:bg-orbit-soft"
+            >
+              Today
+            </button>
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              className="orbit-cta-gold flex min-h-10 items-center justify-center rounded-full px-5 text-xs font-black transition-colors"
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function TimeStepper({
+  label,
+  value,
+  onDecrement,
+  onIncrement
+}: {
+  label: string;
+  value: string;
+  onDecrement: () => void;
+  onIncrement: () => void;
+}) {
+  return (
+    <div className="rounded-[16px] bg-orbit-panel p-1">
+      <span className="block px-2 pb-1 text-[10px] font-black uppercase text-orbit-ink/55">{label}</span>
+      <div className="flex h-10 items-center rounded-full bg-orbit-field p-[1px] shadow-[inset_0_0_0_1px_rgb(255_255_255_/_0.18)]">
+        <button type="button" onClick={onDecrement} className="flex h-full aspect-square shrink-0 items-center justify-center rounded-full bg-orbit-panel text-sm font-black text-orbit-ink">
+          -
+        </button>
+        <span className="min-w-0 flex-1 text-center text-sm font-black text-orbit-ink">{value}</span>
+        <button type="button" onClick={onIncrement} className="orbit-cta-gold flex h-full aspect-square shrink-0 items-center justify-center rounded-full text-sm font-black">
+          +
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -1533,16 +2106,16 @@ function MarketplaceListingCard({
         <div>
           <div className="mb-4 flex flex-wrap items-center gap-2">
             <span
-              className="kind-tag orbit-tag inline-flex h-[clamp(32px,2.4vw,36px)] items-center gap-2 rounded-full border px-[clamp(10px,1vw,12px)] text-[clamp(10px,0.8vw,11px)] font-black uppercase tracking-normal"
+              className="kind-tag orbit-tag inline-flex h-[clamp(32px,2.4vw,36px)] items-center gap-2 rounded-full border px-[clamp(9px,0.9vw,11px)] text-[clamp(9px,0.72vw,10px)] font-black uppercase tracking-normal"
               data-kind={listing.kind}
             >
               {listingIcon(listing.kind)}
               {listingKindLabel(listing.kind)}
             </span>
             {unavailable ? (
-              <span className="orbit-tag inline-flex h-[clamp(32px,2.4vw,36px)] items-center rounded-full bg-orbit-clay px-[clamp(10px,1vw,12px)] text-[clamp(10px,0.8vw,11px)] font-black uppercase text-orbit-field">Booked</span>
+              <span className="orbit-tag inline-flex h-[clamp(32px,2.4vw,36px)] items-center rounded-full bg-orbit-clay px-[clamp(9px,0.9vw,11px)] text-[clamp(9px,0.72vw,10px)] font-black uppercase text-orbit-field">Booked</span>
             ) : (
-              <span className="orbit-tag inline-flex h-[clamp(32px,2.4vw,36px)] items-center rounded-full bg-orbit-soft/85 px-[clamp(10px,1vw,12px)] text-[clamp(10px,0.8vw,11px)] font-black uppercase text-orbit-ink">
+              <span className="orbit-tag inline-flex h-[clamp(32px,2.4vw,36px)] items-center rounded-full bg-orbit-soft/85 px-[clamp(9px,0.9vw,11px)] text-[clamp(9px,0.72vw,10px)] font-black uppercase text-orbit-ink">
                 Available
               </span>
             )}
@@ -1552,9 +2125,9 @@ function MarketplaceListingCard({
           <p className="mt-2 line-clamp-2 text-[clamp(0.8rem,0.95vw,0.95rem)] leading-5 text-neutral-500 2xl:line-clamp-1">{listing.description}</p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 text-[clamp(10px,0.8vw,11px)] font-black text-orbit-ink">
-          <span className="orbit-tag rounded-full bg-orbit-soft/85 px-[clamp(10px,1vw,12px)] py-2">{listing.location.county}</span>
-          <span className="orbit-tag rounded-full bg-orbit-soft/85 px-[clamp(10px,1vw,12px)] py-2">{rate}</span>
+        <div className="flex flex-wrap items-center gap-2 text-[clamp(9px,0.72vw,10px)] font-black text-orbit-ink">
+          <span className="orbit-tag rounded-full bg-orbit-soft/85 px-[clamp(9px,0.9vw,11px)] py-[7px]">{listing.location.county}</span>
+          <span className="orbit-tag rounded-full bg-orbit-soft/85 px-[clamp(9px,0.9vw,11px)] py-[7px]">{rate}</span>
         </div>
       </div>
 
@@ -1644,24 +2217,19 @@ function BookingQuantityControl({
   }
 
   return (
-    <div className="min-w-0 rounded-[24px] border border-orbit-line bg-orbit-field p-4">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-xs font-black uppercase text-orbit-ink/55">Booking quantity</p>
-          <p className="mt-1 text-sm font-semibold text-orbit-ink/60">
-            {availableUnits} available • {bookedUnitsLabel(bookedUnits, totalUnits)}
-          </p>
-        </div>
-        <span className="rounded-full bg-orbit-panel px-3 py-2 text-xs font-black text-orbit-green">
+    <div className="min-w-0">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <p className="text-xs font-black uppercase tracking-[0.06em] text-[#403301] dark:text-orbit-ink/65">Booking quantity</p>
+        <span className="text-sm font-black text-orbit-ink/75">
           Max {availableUnits}
         </span>
       </div>
-      <div className="mt-3 flex h-14 min-w-0 items-center rounded-full border border-orbit-line bg-orbit-panel p-[3px]">
+      <div className="flex h-16 min-w-0 items-center rounded-[14px] bg-orbit-panel p-[4px] shadow-[inset_0_0_0_1px_rgb(128_106_0_/_0.12)]">
         <button
           type="button"
           onClick={() => updateQuantity(selectedQuantity - 1)}
           disabled={disabled || selectedQuantity <= 1}
-          className="flex h-full aspect-square shrink-0 items-center justify-center rounded-full bg-orbit-soft text-lg font-black disabled:cursor-not-allowed disabled:opacity-35"
+          className="flex h-full aspect-square shrink-0 items-center justify-center rounded-[10px] bg-orbit-soft text-2xl font-medium text-[#403301] disabled:cursor-not-allowed disabled:opacity-35 dark:text-orbit-ink"
           title="Decrease quantity"
         >
           -
@@ -1680,36 +2248,45 @@ function BookingQuantityControl({
           disabled={disabled}
           type="text"
           inputMode="numeric"
-          className="h-full min-w-0 flex-1 bg-transparent px-3 text-center text-lg font-black text-orbit-ink outline-none focus:outline-none focus:ring-0 focus-visible:outline-none disabled:opacity-50"
+          className="h-full min-w-0 flex-1 bg-transparent px-3 text-center text-2xl font-black text-orbit-ink outline-none focus:outline-none focus:ring-0 focus-visible:outline-none disabled:opacity-50"
         />
         <button
           type="button"
           onClick={() => updateQuantity(selectedQuantity + 1)}
           disabled={disabled || selectedQuantity >= availableUnits}
-          className="flex h-full aspect-square shrink-0 items-center justify-center rounded-full bg-orbit-green text-lg font-black text-orbit-field disabled:cursor-not-allowed disabled:grayscale disabled:opacity-35"
+          className="orbit-cta-gold flex h-full aspect-square shrink-0 items-center justify-center rounded-[10px] text-3xl font-medium disabled:opacity-35"
           title="Increase quantity"
         >
           +
         </button>
       </div>
+      <p className="mt-2 text-xs font-black text-orbit-ink/58">
+        {availableUnits} available • {bookedUnitsLabel(bookedUnits, totalUnits)}
+      </p>
     </div>
   );
 }
 
 function SummaryLine({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) {
-  return (
-    <div>
-      <p className="text-xs font-semibold uppercase text-neutral-500">{label}</p>
-      <p className={strong ? "font-black text-orbit-green" : "font-bold text-orbit-ink"}>{value}</p>
-    </div>
-  );
-}
+  const strongSizeClass = value.length > 12
+    ? "text-[clamp(1rem,1.8vw,1.32rem)] tracking-tight"
+    : value.length > 9
+      ? "text-[clamp(1.18rem,2.2vw,1.58rem)] tracking-tight"
+      : "text-[clamp(1.55rem,2.8vw,2.05rem)]";
 
-function IconFact({ icon, label }: { icon: React.ReactNode; label: string }) {
   return (
-    <div className="flex min-h-12 items-center gap-2 rounded-[18px] border border-orbit-line bg-orbit-field px-3 py-2 text-xs font-bold">
-      <span className="shrink-0 text-orbit-green">{icon}</span>
-      <span className="min-w-0 truncate">{label}</span>
+    <div className="min-w-0">
+      <p className="text-xs font-black uppercase tracking-[0.06em] text-[#403301] dark:text-orbit-ink/60">{label}</p>
+      <p
+        className={
+          strong
+            ? `mt-1 max-w-full whitespace-nowrap font-black leading-none text-[#806A00] ${strongSizeClass}`
+            : "mt-1 max-w-full truncate text-base font-black text-orbit-ink"
+        }
+        title={value}
+      >
+        {value}
+      </p>
     </div>
   );
 }

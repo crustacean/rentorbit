@@ -86,6 +86,76 @@ textarea:focus-visible {
   scrollbar-width: thin;
 }
 
+.no-scrollbar {
+  scrollbar-width: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.home-footer-divider {
+  border-top-color: #403301;
+}
+
+:root[data-theme="dark"] .home-footer-divider {
+  border-top-color: #f3f6fb;
+}
+
+.orbit-cta-gold {
+  background-color: #efbf04;
+  color: #1a1a1a;
+}
+
+.orbit-cta-gold:hover {
+  background-color: #d9ad03;
+}
+
+.orbit-cta-gold:disabled {
+  cursor: not-allowed;
+  filter: grayscale(1);
+  opacity: 0.45;
+}
+
+.featured-rental-glass {
+  background: rgb(243 246 251 / 0.58);
+  box-shadow: 0 16px 40px rgb(25 32 29 / 0.08);
+  color: #252525;
+  backdrop-filter: blur(22px) saturate(145%);
+  -webkit-backdrop-filter: blur(22px) saturate(145%);
+}
+
+.featured-rental-rating {
+  background: rgb(255 255 255 / 0.62);
+  color: #403301;
+  backdrop-filter: blur(14px) saturate(145%);
+  -webkit-backdrop-filter: blur(14px) saturate(145%);
+  box-shadow: 0 8px 20px rgb(25 32 29 / 0.08);
+}
+
+.auth-modal-card {
+  background: rgb(243 246 251 / 0.78);
+  color: rgb(var(--color-orbit-ink));
+  box-shadow: 0 22px 70px rgb(25 32 29 / 0.22);
+  backdrop-filter: blur(24px) saturate(145%);
+  -webkit-backdrop-filter: blur(24px) saturate(145%);
+}
+
+:root[data-theme="dark"] .featured-rental-glass {
+  background: rgb(26 26 26 / 0.52);
+  color: rgb(var(--color-orbit-ink));
+}
+
+:root[data-theme="dark"] .featured-rental-rating {
+  background: rgb(26 26 26 / 0.56);
+  color: rgb(var(--color-orbit-ink));
+}
+
+:root[data-theme="dark"] .auth-modal-card {
+  background: rgb(26 26 26 / 0.52);
+  box-shadow: 0 26px 80px rgb(0 0 0 / 0.46);
+}
+
 :root[data-theme="dark"] .theme-body-border {
   border-color: rgb(var(--color-orbit-field));
   --tw-ring-color: rgb(var(--color-orbit-field));
@@ -158,6 +228,22 @@ textarea:focus-visible {
 
 .chat-composer-field {
   background-color: rgb(var(--color-orbit-panel));
+}
+
+.marketplace-detail-surface {
+  background-color: #f4f3f8;
+}
+
+.marketplace-map-surface {
+  background-color: #e9e7ed;
+}
+
+:root[data-theme="dark"] .marketplace-detail-surface {
+  background-color: rgb(53 58 62 / 0.45);
+}
+
+:root[data-theme="dark"] .marketplace-map-surface {
+  background-color: #2f3336;
 }
 
 .landing-shell {

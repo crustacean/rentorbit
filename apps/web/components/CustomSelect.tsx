@@ -26,11 +26,11 @@ export type CustomSelectProps = {
 
 const defaultLabelClass = "mb-1 block text-xs font-semibold uppercase text-orbit-ink/55";
 const defaultButtonClass =
-  "flex min-h-10 w-full items-center gap-3 rounded-[18px] border border-orbit-line bg-orbit-panel py-2 pl-3 pr-2 text-left text-sm font-semibold text-orbit-ink outline-none transition hover:bg-orbit-soft/45 focus:border-orbit-line focus:outline-none focus:ring-0 focus-visible:outline-none";
+  "flex min-h-10 w-full items-center gap-3 rounded-[18px] bg-orbit-panel py-2 pl-3 pr-2 text-left text-sm font-semibold text-orbit-ink outline-none shadow-[inset_0_0_0_1px_rgb(255_255_255_/_0.22)] transition hover:bg-orbit-soft/45 focus:outline-none focus:ring-0 focus-visible:outline-none";
 const defaultArrowClass =
   "flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-orbit-panel/75 text-orbit-ink";
 const defaultMenuClass =
-  "absolute left-0 right-0 top-[calc(100%+8px)] z-[80] overflow-hidden rounded-[24px] border border-orbit-line bg-orbit-panel p-2 shadow-[0_18px_42px_rgba(25,32,29,0.14)]";
+  "absolute left-0 right-0 top-[calc(100%+8px)] z-[80] overflow-hidden rounded-[24px] bg-orbit-panel p-2 shadow-[0_18px_42px_rgba(25,32,29,0.14)]";
 
 export function CustomSelect({
   label,
@@ -130,10 +130,10 @@ export function CustomSelect({
                   }`}
                 >
                   <span
-                    className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md border ${
+                    className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md ${
                       selected
-                        ? "border-orbit-sky bg-orbit-sky text-orbit-field"
-                        : "border-orbit-line bg-orbit-panel text-transparent"
+                        ? "bg-orbit-sky text-orbit-field"
+                        : "bg-orbit-panel text-transparent"
                     }`}
                     aria-hidden="true"
                   >

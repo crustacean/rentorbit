@@ -5,21 +5,26 @@ import {
   BadgeCheck,
   Banknote,
   CalendarClock,
+  Check,
   ChevronLeft,
   ChevronRight,
   CircleUserRound,
-  Grip,
   FileSignature,
+  Grip,
   Heart,
   ImagePlus,
+  LoaderCircle,
   MapPin,
   MessageCircle,
   PackageCheck,
   PencilLine,
   Plus,
+  Scissors,
   Send,
   ShieldCheck,
+  Star,
   Tag,
+  Truck,
   Upload,
   WalletCards,
   ZoomIn,
@@ -27,9 +32,13 @@ import {
   X
 } from "lucide-react";
 import { CustomSelect, type CustomSelectOption } from "@/components/CustomSelect";
-import { ThemeSwitcher } from "@/components/ThemeSwitcher";
-import Link from "next/link";
-import { calculateBookingQuote, seededListings, type OperationMode, type ResourceListing } from "@rentorbit/shared";
+import { SiteHeader } from "@/components/SiteHeader";
+import {
+  formatImageBytes,
+  processListingImageFile,
+  type ListingImageCropFocus
+} from "@/lib/listingImageUpload";
+import { calculateBookingQuote, publicLocationOffset, seededListings, type Coordinates, type OperationMode, type ResourceListing } from "@rentorbit/shared";
 import { useEffect, useMemo, useState, type CSSProperties, type Dispatch, type SetStateAction } from "react";
 
 export type AccountDashboardProps = {
@@ -48,9 +57,23 @@ type ListingPhoto = {
   id: string;
   name: string;
   previewUrl: string;
+  width?: number;
+  height?: number;
+  mimeType?: string;
+  originalSizeBytes?: number;
+  compressedSizeBytes?: number;
 };
 
 type ListingMobility = "mobile" | "transportable" | "fixed_in_place";
+
+type PendingPhotoUpload = {
+  id: string;
+  file: File;
+  name: string;
+  previewUrl: string;
+  cropFocus: ListingImageCropFocus;
+  originalSizeBytes: number;
+};
 
 type OwnerListing = {
   id: string;
@@ -317,12 +340,17 @@ function makePhoto(name: string): ListingPhoto {
     .join("")
     .slice(0, 2)
     .toUpperCase() || "RO";
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="240" height="180" viewBox="0 0 240 180"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e8e6e3"/><stop offset="1" stop-color="#c8bfb1"/></linearGradient></defs><rect width="240" height="180" rx="28" fill="url(#g)"/><circle cx="120" cy="82" r="34" fill="#ffffff" fill-opacity="0.62"/><text x="120" y="94" text-anchor="middle" font-family="Inter,Arial,sans-serif" font-size="24" font-weight="800" fill="#295485">${label}</text><text x="120" y="135" text-anchor="middle" font-family="Inter,Arial,sans-serif" font-size="12" font-weight="700" fill="#353A3E">RentOrbit</text></svg>`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="250" height="350" viewBox="0 0 250 350"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e8e6e3"/><stop offset="1" stop-color="#c8bfb1"/></linearGradient></defs><rect width="250" height="350" rx="34" fill="url(#g)"/><circle cx="125" cy="156" r="44" fill="#ffffff" fill-opacity="0.62"/><text x="125" y="171" text-anchor="middle" font-family="Inter,Arial,sans-serif" font-size="28" font-weight="800" fill="#295485">${label}</text><text x="125" y="236" text-anchor="middle" font-family="Inter,Arial,sans-serif" font-size="13" font-weight="700" fill="#353A3E">RentOrbit</text></svg>`;
 
   return {
     id: name,
     name,
-    previewUrl: `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`
+    previewUrl: `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`,
+    width: 250,
+    height: 350,
+    mimeType: "image/svg+xml",
+    originalSizeBytes: svg.length,
+    compressedSizeBytes: svg.length
   };
 }
 
@@ -510,7 +538,7 @@ const initialThreads: ChatThread[] = [
 
 const panelClass = "theme-body-border rounded-[36px] bg-orbit-panel/92 ring-1 ring-white/70";
 const fieldClass =
-  "w-full rounded-[18px] border border-orbit-line bg-orbit-panel px-3 py-2 text-sm font-semibold text-orbit-ink outline-none focus:border-orbit-line focus:outline-none focus:ring-0 focus-visible:outline-none";
+  "w-full rounded-[18px] bg-orbit-panel px-3 py-2 text-sm font-semibold text-orbit-ink outline-none shadow-[inset_0_0_0_1px_rgb(255_255_255_/_0.22)] focus:outline-none focus:ring-0 focus-visible:outline-none";
 const labelClass = "mb-1 block text-xs font-semibold uppercase text-orbit-ink/55";
 const listingKindOptions: CustomSelectOption[] = [
   { value: "good", label: "Goods" },
@@ -561,6 +589,9 @@ export function AccountDashboard({ email, onSignOut }: AccountDashboardProps) {
   const [quantity, setQuantity] = useState("1");
   const [description, setDescription] = useState("");
   const [photos, setPhotos] = useState<ListingPhoto[]>([]);
+  const [pendingPhotoUploads, setPendingPhotoUploads] = useState<PendingPhotoUpload[]>([]);
+  const [photoUploadBusy, setPhotoUploadBusy] = useState(false);
+  const [photoUploadError, setPhotoUploadError] = useState("");
   const [ownerListings, setOwnerListings] = useState<OwnerListing[]>(initialOwnerListings);
   const [completedRentalItems, setCompletedRentalItems] = useState<ActivityItem[]>([]);
   const [bookedUnitCounts, setBookedUnitCounts] = useState<Record<string, number>>(() =>
@@ -583,6 +614,7 @@ export function AccountDashboard({ email, onSignOut }: AccountDashboardProps) {
   const [focusedImageIndex, setFocusedImageIndex] = useState(0);
   const [focusedZoom, setFocusedZoom] = useState(1);
   const [focusedPanel, setFocusedPanel] = useState<FocusedAccountPanel>("details");
+  const [focusedSelectedMode, setFocusedSelectedMode] = useState<OperationMode>("self_operated");
   const [focusedDraft, setFocusedDraft] = useState("");
   const [focusedThread, setFocusedThread] = useState<ChatThread | null>(null);
   const [focusedQuantity, setFocusedQuantity] = useState("1");
@@ -600,7 +632,7 @@ export function AccountDashboard({ email, onSignOut }: AccountDashboardProps) {
   const activeRentalsCount = activeRentalItems.length + completedRentalItems.length;
   const savedItemsCount = savedActivityItems.length + savedMarketplaceItems.length;
   const focusedListing = focusedListingId ? seededListings.find((listing) => listing.id === focusedListingId) ?? null : null;
-  const focusedMode = focusedListing?.modeRules[0]?.mode ?? "self_operated";
+  const focusedMode = focusedListing?.modeRules.find((rule) => rule.mode === focusedSelectedMode)?.mode ?? focusedListing?.modeRules[0]?.mode ?? "self_operated";
   const focusedQuote = focusedListing
     ? calculateBookingQuote({
         listing: focusedListing,
@@ -611,6 +643,7 @@ export function AccountDashboard({ email, onSignOut }: AccountDashboardProps) {
     : null;
   const focusedGallery = focusedListing ? focusedGalleryForListing(focusedListing) : [];
   const focusedImage = focusedGallery[focusedImageIndex] ?? focusedGallery[0];
+  const focusedPublicCoordinates = focusedListing ? publicLocationOffset(focusedListing) : undefined;
   const focusedTotalUnits = focusedListing ? listingInventoryTotal(focusedListing) : 1;
   const focusedBookedUnits = focusedListing ? Math.min(focusedTotalUnits, bookedUnitCounts[focusedListing.id] ?? 0) : 0;
   const focusedAvailableUnits = Math.max(0, focusedTotalUnits - focusedBookedUnits);
@@ -735,6 +768,82 @@ export function AccountDashboard({ email, onSignOut }: AccountDashboardProps) {
     resetCreateForm();
   }
 
+  function preparePhotoUploads(files: FileList | null) {
+    const selectedFiles = Array.from(files ?? []);
+
+    if (!selectedFiles.length) {
+      return;
+    }
+
+    setPhotoUploadError("");
+    setPhotoUploadBusy(false);
+    setPendingPhotoUploads(
+      selectedFiles
+        .filter((file) => file.type.startsWith("image/"))
+        .map((file) => ({
+          id: `${file.name}-${file.lastModified}-${file.size}`,
+          file,
+          name: file.name,
+          previewUrl: URL.createObjectURL(file),
+          cropFocus: { x: 0.5, y: 0.5 },
+          originalSizeBytes: file.size
+        }))
+    );
+
+    if (selectedFiles.some((file) => !file.type.startsWith("image/"))) {
+      setPhotoUploadError("Only image files can be added to a listing");
+    }
+  }
+
+  function cancelPreparedPhotoUploads() {
+    pendingPhotoUploads.forEach((photo) => URL.revokeObjectURL(photo.previewUrl));
+    setPendingPhotoUploads([]);
+    setPhotoUploadBusy(false);
+    setPhotoUploadError("");
+  }
+
+  function updatePendingPhotoCrop(photoId: string, cropFocus: ListingImageCropFocus) {
+    setPendingPhotoUploads((current) =>
+      current.map((photo) => (photo.id === photoId ? { ...photo, cropFocus } : photo))
+    );
+  }
+
+  async function confirmPreparedPhotoUploads() {
+    if (!pendingPhotoUploads.length) {
+      return;
+    }
+
+    setPhotoUploadBusy(true);
+    setPhotoUploadError("");
+
+    try {
+      const preparedPhotos = await Promise.all(
+        pendingPhotoUploads.map((photo) => processListingImageFile(photo.file, photo.cropFocus))
+      );
+      const nextPhotos: ListingPhoto[] = preparedPhotos.map((photo) => ({
+        id: photo.id,
+        name: photo.fileName,
+        previewUrl: photo.previewUrl,
+        width: photo.width,
+        height: photo.height,
+        mimeType: photo.mimeType,
+        originalSizeBytes: photo.originalSizeBytes,
+        compressedSizeBytes: photo.compressedSizeBytes
+      }));
+
+      setPhotos((current) => [
+        ...current,
+        ...nextPhotos.filter((photo) => !current.some((currentPhoto) => currentPhoto.id === photo.id))
+      ]);
+      pendingPhotoUploads.forEach((photo) => URL.revokeObjectURL(photo.previewUrl));
+      setPendingPhotoUploads([]);
+    } catch (error) {
+      setPhotoUploadError(error instanceof Error ? error.message : "Could not prepare selected images");
+    } finally {
+      setPhotoUploadBusy(false);
+    }
+  }
+
   function openThread(threadId: string) {
     setActiveThreadId(threadId);
     setChatDraft("");
@@ -778,6 +887,7 @@ export function AccountDashboard({ email, onSignOut }: AccountDashboardProps) {
     setFocusedImageIndex(0);
     setFocusedZoom(1);
     setFocusedPanel("details");
+    setFocusedSelectedMode(listing.modeRules[0]?.mode ?? "self_operated");
     setFocusedDraft("");
     setFocusedThread(null);
     setFocusedQuantity("1");
@@ -920,8 +1030,10 @@ export function AccountDashboard({ email, onSignOut }: AccountDashboardProps) {
       setMobility={setMobility}
       setQuantity={setQuantity}
       setDescription={setDescription}
-      setPhotos={setPhotos}
       deletePhoto={deletePhoto}
+      photoUploadBusy={photoUploadBusy}
+      photoUploadError={photoUploadError}
+      preparePhotoUploads={preparePhotoUploads}
       saveListing={saveListing}
     />
   );
@@ -943,33 +1055,7 @@ export function AccountDashboard({ email, onSignOut }: AccountDashboardProps) {
 
   return (
     <main className="min-h-screen overflow-x-hidden bg-orbit-field text-orbit-ink">
-      <header className="theme-body-border border-b border-white/70 bg-orbit-panel/90">
-        <div className="flex w-full items-center justify-between gap-3 px-4 py-4">
-          <Link href="/" className="flex min-w-0 items-center gap-3" aria-label="RentOrbit home">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-orbit-green text-orbit-field">
-              <span className="text-lg font-black">RO</span>
-            </div>
-            <div className="min-w-0">
-              <p className="truncate text-xl font-black leading-none text-orbit-ink sm:text-2xl">RentOrbit</p>
-              <p className="mt-1 truncate text-sm font-semibold text-orbit-ink/65">Account workspace</p>
-            </div>
-          </Link>
-          <div className="flex shrink-0 items-center gap-2">
-            <ThemeSwitcher compact />
-            <button type="button" onClick={onSignOut} className="theme-body-border rounded-full bg-orbit-panel/90 px-4 py-3 text-sm font-black ring-1 ring-white/70 transition-colors hover:bg-orbit-soft">
-              Sign out
-            </button>
-            <Link
-              href="/account"
-              className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-orbit-panel/90 text-orbit-ink shadow-[0_2px_14px_rgba(25,32,29,0.12)] backdrop-blur transition-colors hover:bg-orbit-panel focus-visible:outline-none"
-              title="Account"
-            >
-              <CircleUserRound className="h-7 w-7" aria-hidden="true" />
-              <span className="sr-only">Account</span>
-            </Link>
-          </div>
-        </div>
-      </header>
+      <SiteHeader active="account" sessionEmail={email} onSignOut={onSignOut} />
 
       <AccountMobilePanelBar onOpen={setMobilePanel} />
 
@@ -1048,6 +1134,8 @@ export function AccountDashboard({ email, onSignOut }: AccountDashboardProps) {
           totalUnits={focusedTotalUnits}
           bookedUnits={focusedBookedUnits}
           availableUnits={focusedAvailableUnits}
+          publicCoordinates={focusedPublicCoordinates}
+          setSelectedMode={setFocusedSelectedMode}
           panel={focusedPanel}
           setPanel={setFocusedPanel}
           thread={focusedThread ?? marketplaceThreadForListing(focusedListing)}
@@ -1059,6 +1147,17 @@ export function AccountDashboard({ email, onSignOut }: AccountDashboardProps) {
           completeBooking={completeFocusedBooking}
           booked={focusedListingBooked}
           onClose={() => setFocusedListingId(null)}
+        />
+      ) : null}
+
+      {photoUploadBusy || pendingPhotoUploads.length > 0 || photoUploadError ? (
+        <ImageUploadReviewModal
+          busy={photoUploadBusy}
+          error={photoUploadError}
+          photos={pendingPhotoUploads}
+          onCropChange={updatePendingPhotoCrop}
+          onCancel={cancelPreparedPhotoUploads}
+          onConfirm={confirmPreparedPhotoUploads}
         />
       ) : null}
     </main>
@@ -1125,6 +1224,202 @@ function AccountMobilePanelOverlay({
         </button>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto p-3">{children}</div>
+    </div>
+  );
+}
+
+function ImageUploadReviewModal({
+  busy,
+  error,
+  photos,
+  onCropChange,
+  onCancel,
+  onConfirm
+}: {
+  busy: boolean;
+  error: string;
+  photos: PendingPhotoUpload[];
+  onCropChange: (photoId: string, cropFocus: ListingImageCropFocus) => void;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const totalOriginalSize = photos.reduce((total, photo) => total + photo.originalSizeBytes, 0);
+  const hasPreparedPhotos = photos.length > 0;
+
+  return (
+    <div className="fixed inset-0 z-[90] grid place-items-center bg-black/62 p-3 backdrop-blur-xl" role="dialog" aria-modal="true" aria-label="Review prepared listing images">
+      <section className="grid max-h-[min(760px,calc(100svh-24px))] w-full max-w-3xl grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden rounded-[34px] bg-orbit-panel/95 text-orbit-ink shadow-[0_28px_80px_rgba(0,0,0,0.34)]">
+        <div className="flex items-start justify-between gap-4 p-5">
+          <div>
+            <div className="flex items-center gap-2 text-sm font-black text-orbit-green">
+              <Scissors className="h-4 w-4" aria-hidden="true" />
+              Image preparation
+            </div>
+            <h2 className="mt-2 text-2xl font-black">Review upload</h2>
+            <p className="mt-1 text-sm font-semibold text-orbit-ink/62">
+              Drag each photo inside the 5:7 window to choose the best angle before compression.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onCancel}
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-orbit-field text-orbit-ink"
+            aria-label="Close image review"
+          >
+            <X className="h-5 w-5" aria-hidden="true" />
+          </button>
+        </div>
+
+        <div className="min-h-0 overflow-y-auto px-5 pb-5">
+          {busy ? (
+            <div className="grid min-h-80 place-items-center rounded-[28px] bg-orbit-field text-center">
+              <div>
+                <LoaderCircle className="mx-auto h-8 w-8 animate-spin text-orbit-green" aria-hidden="true" />
+                <p className="mt-4 text-sm font-black">Compressing images</p>
+                <p className="mt-1 text-xs font-semibold text-orbit-ink/60">Applying your crop positions and preparing upload files.</p>
+              </div>
+            </div>
+          ) : null}
+
+          {!busy && error ? (
+            <div className="rounded-[28px] bg-[#FF5F57]/12 p-5 text-sm font-bold text-[#FF5F57]">{error}</div>
+          ) : null}
+
+          {!busy && hasPreparedPhotos ? (
+            <div className="grid gap-4">
+              <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
+                <div className="rounded-[22px] bg-orbit-field p-4">
+                  <p className="text-xs font-black uppercase text-orbit-ink/55">Images</p>
+                  <p className="mt-1 text-xl font-black">{photos.length}</p>
+                </div>
+                <div className="rounded-[22px] bg-orbit-field p-4">
+                  <p className="text-xs font-black uppercase text-orbit-ink/55">Before</p>
+                  <p className="mt-1 text-xl font-black">{formatImageBytes(totalOriginalSize)}</p>
+                </div>
+                <div className="rounded-[22px] bg-orbit-field p-4">
+                  <p className="text-xs font-black uppercase text-orbit-ink/55">Output</p>
+                  <p className="mt-1 text-xl font-black">5:7</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+                {photos.map((photo) => (
+                  <article key={photo.id} className="overflow-hidden rounded-[24px] bg-orbit-field p-2">
+                    <DraggableCropPreview photo={photo} onCropChange={onCropChange} />
+                    <div className="px-1 py-2">
+                      <p className="truncate text-xs font-black">{photo.name}</p>
+                      <p className="mt-1 text-[10px] font-bold text-orbit-ink/58">
+                        1000x1400 • {formatImageBytes(photo.originalSizeBytes)}
+                      </p>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </div>
+          ) : null}
+        </div>
+
+        <div className="grid gap-2 p-5 sm:grid-cols-2">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="flex min-h-12 items-center justify-center rounded-full bg-orbit-field px-5 text-sm font-black text-orbit-ink"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={busy || !hasPreparedPhotos}
+            className="orbit-cta-gold flex min-h-12 items-center justify-center gap-2 rounded-full px-5 text-sm font-black disabled:cursor-not-allowed disabled:opacity-45"
+          >
+            <Upload className="h-4 w-4" aria-hidden="true" />
+            Compress and upload
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function DraggableCropPreview({
+  photo,
+  onCropChange
+}: {
+  photo: PendingPhotoUpload;
+  onCropChange: (photoId: string, cropFocus: ListingImageCropFocus) => void;
+}) {
+  const [dragState, setDragState] = useState<{
+    pointerId: number;
+    startClientX: number;
+    startClientY: number;
+    startFocusX: number;
+    startFocusY: number;
+    width: number;
+    height: number;
+  } | null>(null);
+  const isDragging = Boolean(dragState);
+
+  function clampCropFocus(value: number) {
+    return Math.min(1, Math.max(0, value));
+  }
+
+  function handlePointerDown(event: React.PointerEvent<HTMLDivElement>) {
+    const bounds = event.currentTarget.getBoundingClientRect();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setDragState({
+      pointerId: event.pointerId,
+      startClientX: event.clientX,
+      startClientY: event.clientY,
+      startFocusX: photo.cropFocus.x,
+      startFocusY: photo.cropFocus.y,
+      width: bounds.width,
+      height: bounds.height
+    });
+  }
+
+  function handlePointerMove(event: React.PointerEvent<HTMLDivElement>) {
+    if (!dragState || dragState.pointerId !== event.pointerId) {
+      return;
+    }
+
+    const deltaX = (event.clientX - dragState.startClientX) / dragState.width;
+    const deltaY = (event.clientY - dragState.startClientY) / dragState.height;
+    onCropChange(photo.id, {
+      x: clampCropFocus(dragState.startFocusX - deltaX),
+      y: clampCropFocus(dragState.startFocusY - deltaY)
+    });
+  }
+
+  function finishDrag(event: React.PointerEvent<HTMLDivElement>) {
+    if (dragState?.pointerId === event.pointerId) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+      setDragState(null);
+    }
+  }
+
+  return (
+    <div
+      className={`relative aspect-[5/7] touch-none overflow-hidden rounded-[20px] bg-orbit-soft ${isDragging ? "cursor-grabbing" : "cursor-grab"}`}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={finishDrag}
+      onPointerCancel={finishDrag}
+      title="Drag to reposition crop"
+    >
+      <img
+        src={photo.previewUrl}
+        alt={photo.name}
+        draggable={false}
+        className="h-full w-full select-none object-cover"
+        style={{ objectPosition: `${photo.cropFocus.x * 100}% ${photo.cropFocus.y * 100}%` }}
+      />
+      <span className="pointer-events-none absolute left-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-[#EFBF04] text-[#403301]">
+        <Check className="h-4 w-4" aria-hidden="true" />
+      </span>
+      <span className="pointer-events-none absolute inset-x-2 bottom-2 rounded-full bg-black/55 px-2 py-1 text-center text-[10px] font-black text-white backdrop-blur">
+        Drag to reposition
+      </span>
     </div>
   );
 }
@@ -1222,8 +1517,10 @@ function CreateListingPanel({
   setMobility,
   setQuantity,
   setDescription,
-  setPhotos,
   deletePhoto,
+  photoUploadBusy,
+  photoUploadError,
+  preparePhotoUploads,
   saveListing
 }: {
   title: string;
@@ -1243,8 +1540,10 @@ function CreateListingPanel({
   setMobility: (value: ListingMobility) => void;
   setQuantity: (value: string) => void;
   setDescription: (value: string) => void;
-  setPhotos: Dispatch<SetStateAction<ListingPhoto[]>>;
   deletePhoto: (photoId: string) => void;
+  photoUploadBusy: boolean;
+  photoUploadError: string;
+  preparePhotoUploads: (files: FileList | null) => void;
   saveListing: () => void;
 }) {
   return (
@@ -1314,20 +1613,20 @@ function CreateListingPanel({
           <textarea
             value={description}
             onChange={(event) => setDescription(event.target.value)}
-            className="min-h-28 w-full resize-none rounded-[18px] border border-orbit-line bg-orbit-panel px-3 py-2 text-sm font-semibold leading-6 text-orbit-ink outline-none focus:border-orbit-line focus:outline-none focus:ring-0 focus-visible:outline-none"
+            className="min-h-28 w-full resize-none rounded-[18px] bg-orbit-panel px-3 py-2 text-sm font-semibold leading-6 text-orbit-ink outline-none shadow-[inset_0_0_0_1px_rgb(255_255_255_/_0.22)] focus:outline-none focus:ring-0 focus-visible:outline-none"
           />
         </label>
 
         <label className="block cursor-pointer">
           <span className={labelClass}>Pictures</span>
-          <div className="grid min-h-28 place-items-center rounded-[18px] border border-dashed border-orbit-line bg-orbit-panel p-3 text-center transition hover:bg-orbit-soft/50">
+          <div className="grid min-h-28 place-items-center rounded-[18px] bg-orbit-panel p-3 text-center shadow-[inset_0_0_0_1px_rgb(255_255_255_/_0.22)] transition hover:bg-orbit-soft/50">
             <span className="flex h-12 w-12 items-center justify-center rounded-full bg-orbit-field text-orbit-green">
               <ImagePlus className="h-5 w-5" aria-hidden="true" />
             </span>
             <div className="mt-2 min-w-0">
               <p className="text-sm font-black">Add photos</p>
               <p className="mt-1 truncate text-xs font-semibold text-orbit-ink/60">
-                {photos.length ? `${photos.length} photo(s) ready` : "JPG, PNG, or WebP"}
+                {photoUploadBusy ? "Preparing 5:7 compressed images" : photos.length ? `${photos.length} photo(s) ready` : "JPG, PNG, or WebP"}
               </p>
             </div>
             <Upload className="mt-2 h-4 w-4 text-orbit-green" aria-hidden="true" />
@@ -1337,30 +1636,32 @@ function CreateListingPanel({
               accept="image/*"
               className="sr-only"
               onChange={(event) => {
-                const nextPhotos = Array.from(event.target.files ?? []).map((file) => ({
-                  id: `${file.name}-${file.lastModified}-${file.size}`,
-                  name: file.name,
-                  previewUrl: URL.createObjectURL(file)
-                }));
-                setPhotos((current) => [
-                  ...current,
-                  ...nextPhotos.filter((photo) => !current.some((currentPhoto) => currentPhoto.id === photo.id))
-                ]);
+                preparePhotoUploads(event.target.files);
+                event.target.value = "";
               }}
             />
           </div>
         </label>
+
+        {photoUploadError ? (
+          <p className="rounded-[18px] bg-[#FF5F57]/12 px-3 py-2 text-xs font-bold text-[#FF5F57]">{photoUploadError}</p>
+        ) : null}
 
         {photos.length ? (
           <div className="grid gap-2">
             <span className={labelClass}>Existing pictures</span>
             <div className="grid grid-cols-3 gap-2">
               {photos.map((photo) => (
-                <div key={photo.id} className="group relative aspect-square overflow-hidden rounded-[18px] bg-orbit-panel ring-1 ring-orbit-line">
+                <div key={photo.id} className="group relative aspect-[5/7] overflow-hidden rounded-[18px] bg-orbit-panel ring-1 ring-orbit-line">
                   <img src={photo.previewUrl} alt={photo.name} className="h-full w-full object-cover" />
                   <span className="absolute inset-x-1 bottom-1 truncate rounded-full bg-orbit-panel/90 px-2 py-1 text-[10px] font-black text-orbit-ink">
                     {photo.name}
                   </span>
+                  {photo.width && photo.height ? (
+                    <span className="absolute left-1 top-1 rounded-full bg-orbit-panel/90 px-2 py-1 text-[9px] font-black text-orbit-green">
+                      {photo.width}:{photo.height}
+                    </span>
+                  ) : null}
                   <button
                     type="button"
                     onClick={() => deletePhoto(photo.id)}
@@ -1379,7 +1680,7 @@ function CreateListingPanel({
           type="button"
           onClick={saveListing}
           disabled={!canCreate}
-          className="flex min-h-[64px] items-center justify-center gap-2 rounded-full bg-orbit-green px-6 text-sm font-black text-orbit-field transition disabled:cursor-not-allowed disabled:grayscale disabled:opacity-45"
+          className="orbit-cta-gold flex min-h-[64px] items-center justify-center gap-2 rounded-full px-6 text-sm font-black transition"
         >
           <span className="flex h-5 w-5 shrink-0 items-center justify-center">
             {editingListingId ? <PencilLine className="h-5 w-5" aria-hidden="true" /> : <Plus className="h-5 w-5" aria-hidden="true" />}
@@ -1534,7 +1835,7 @@ function ActivityCard({
           <p className="mt-1 line-clamp-2 text-xs font-semibold leading-5 text-orbit-ink/60">{item.description}</p>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-2">
-          <span className="orbit-tag rounded-full bg-orbit-soft px-3 py-2 text-[10px] font-black uppercase">
+          <span className="orbit-tag rounded-full bg-orbit-soft px-[11px] py-[7px] text-[10px] font-black uppercase">
             {item.status}
           </span>
         </div>
@@ -1545,7 +1846,7 @@ function ActivityCard({
             const detailKind = kindFromTagText(detail);
 
             return detailKind ? (
-              <span key={`${item.id}-${detail}-${index}`} className="kind-tag orbit-tag rounded-full px-3 py-2" data-kind={detailKind}>
+              <span key={`${item.id}-${detail}-${index}`} className="kind-tag orbit-tag rounded-full px-[11px] py-[7px]" data-kind={detailKind}>
                 {listingKindLabel(detailKind)}
               </span>
             ) : (
@@ -1600,6 +1901,8 @@ function AccountFocusedListingOverlay({
   totalUnits,
   bookedUnits,
   availableUnits,
+  publicCoordinates,
+  setSelectedMode,
   panel,
   setPanel,
   thread,
@@ -1627,6 +1930,8 @@ function AccountFocusedListingOverlay({
   totalUnits: number;
   bookedUnits: number;
   availableUnits: number;
+  publicCoordinates?: Coordinates;
+  setSelectedMode: (mode: OperationMode) => void;
   panel: FocusedAccountPanel;
   setPanel: (panel: FocusedAccountPanel) => void;
   thread: ChatThread;
@@ -1661,85 +1966,84 @@ function AccountFocusedListingOverlay({
   }
 
   return (
-    <div className="fixed inset-0 z-[80] bg-orbit-field p-2 text-orbit-ink sm:p-3" role="dialog" aria-modal="true" aria-label={listing.title}>
-      <div className="grid h-full min-w-0 overflow-hidden rounded-[34px] border-2 border-[#4391F5] bg-orbit-panel shadow-[0_24px_70px_rgba(25,32,29,0.22)] lg:grid-cols-[minmax(0,7fr)_minmax(340px,3fr)]">
-        <section className="relative min-h-[55svh] overflow-hidden bg-[#1A1A1A] lg:min-h-0">
-          <div className="absolute left-4 top-4 z-20 flex items-center gap-2 rounded-full bg-black/65 p-1 text-white backdrop-blur">
+    <div className="fixed inset-0 z-[80] bg-orbit-field p-3 text-orbit-ink sm:p-5" role="dialog" aria-modal="true" aria-label={listing.title}>
+      <div className="relative grid h-full min-w-0 overflow-hidden rounded-[34px] border-2 border-[#4391F5] bg-orbit-panel shadow-[0_24px_70px_rgba(25,32,29,0.18)] lg:grid-cols-[minmax(0,65fr)_minmax(0,35fr)]">
+        <section className="relative min-h-[52svh] overflow-hidden bg-orbit-field p-5 sm:p-8 lg:min-h-0">
             <button
               type="button"
               onClick={onClose}
-              className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20"
+              className="absolute left-5 top-5 z-30 flex h-16 w-16 items-center justify-center rounded-full bg-orbit-panel text-orbit-ink shadow-[0_12px_30px_rgba(25,32,29,0.18)] transition-colors hover:bg-orbit-soft"
               title="Close"
             >
-              <X className="h-5 w-5" aria-hidden="true" />
+              <X className="h-8 w-8" aria-hidden="true" />
               <span className="sr-only">Close focused listing</span>
             </button>
-            <span className="max-w-[42vw] truncate pr-3 text-sm font-black">{listing.title}</span>
-          </div>
 
-          <div className="flex h-full w-full items-center justify-center overflow-hidden">
+          <div className="flex h-full w-full items-center justify-center overflow-hidden rounded-[26px] bg-orbit-field">
             {image ? (
               <img
                 src={image.url}
                 alt={image.alt || listing.title}
-                className="h-full w-full object-contain transition-transform duration-200 ease-out"
+                className="max-h-full max-w-full select-none object-contain transition-transform duration-200 ease-out"
                 style={{ transform: `scale(${zoom})`, transformOrigin: "center center" }}
               />
             ) : null}
           </div>
 
-          <div className="absolute bottom-5 left-5 z-20 flex rounded-[18px] bg-black p-1 text-white shadow-[0_12px_30px_rgba(0,0,0,0.28)]">
-            <button
-              type="button"
-              onClick={() => shiftImage("previous")}
-              disabled={!hasMultipleImages}
-              className="flex h-12 w-12 items-center justify-center rounded-[14px] disabled:cursor-not-allowed disabled:opacity-35"
-              title="Previous image"
-            >
-              <ChevronLeft className="h-6 w-6" aria-hidden="true" />
-              <span className="sr-only">Previous image</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => shiftImage("next")}
-              disabled={!hasMultipleImages}
-              className="flex h-12 w-12 items-center justify-center rounded-[14px] disabled:cursor-not-allowed disabled:opacity-35"
-              title="Next image"
-            >
-              <ChevronRight className="h-6 w-6" aria-hidden="true" />
-              <span className="sr-only">Next image</span>
-            </button>
-          </div>
+          <div className="absolute bottom-8 right-8 z-20 flex flex-wrap justify-end gap-3">
+            <div className="flex h-12 items-center rounded-[14px] bg-orbit-panel p-1 text-orbit-ink shadow-[0_10px_24px_rgba(25,32,29,0.12)]">
+              <button
+                type="button"
+                onClick={() => updateZoom(zoom - 0.2)}
+                disabled={zoom <= 1}
+                className="flex h-10 w-10 items-center justify-center rounded-[10px] disabled:cursor-not-allowed disabled:opacity-35"
+                title="Zoom out"
+              >
+                <ZoomOut className="h-4 w-4" aria-hidden="true" />
+                <span className="sr-only">Zoom out</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => updateZoom(zoom + 0.2)}
+                disabled={zoom >= 2.5}
+                className="flex h-10 w-10 items-center justify-center rounded-[10px] disabled:cursor-not-allowed disabled:opacity-35"
+                title="Zoom in"
+              >
+                <ZoomIn className="h-4 w-4" aria-hidden="true" />
+                <span className="sr-only">Zoom in</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setZoom(1)}
+                className="h-10 rounded-[10px] px-3 text-xs font-black"
+                title="Reset zoom"
+              >
+                {Math.round(zoom * 100)}%
+              </button>
+            </div>
 
-          <div className="absolute bottom-5 right-5 z-20 flex rounded-[18px] bg-black p-1 text-white shadow-[0_12px_30px_rgba(0,0,0,0.28)]">
-            <button
-              type="button"
-              onClick={() => updateZoom(zoom - 0.2)}
-              disabled={zoom <= 1}
-              className="flex h-12 w-12 items-center justify-center rounded-[14px] disabled:cursor-not-allowed disabled:opacity-35"
-              title="Zoom out"
-            >
-              <ZoomOut className="h-5 w-5" aria-hidden="true" />
-              <span className="sr-only">Zoom out</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => updateZoom(zoom + 0.2)}
-              disabled={zoom >= 2.5}
-              className="flex h-12 w-12 items-center justify-center rounded-[14px] disabled:cursor-not-allowed disabled:opacity-35"
-              title="Zoom in"
-            >
-              <ZoomIn className="h-5 w-5" aria-hidden="true" />
-              <span className="sr-only">Zoom in</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setZoom(1)}
-              className="hidden h-12 items-center justify-center rounded-[14px] px-3 text-xs font-black sm:flex"
-              title="Reset zoom"
-            >
-              {Math.round(zoom * 100)}%
-            </button>
+            <div className="flex h-12 items-center rounded-[14px] bg-orbit-panel p-1 text-orbit-ink shadow-[0_10px_24px_rgba(25,32,29,0.12)]">
+              <button
+                type="button"
+                onClick={() => shiftImage("previous")}
+                disabled={!hasMultipleImages}
+                className="flex h-10 w-10 items-center justify-center rounded-[10px] disabled:cursor-not-allowed disabled:opacity-35"
+                title="Previous image"
+              >
+                <ChevronLeft className="h-5 w-5" aria-hidden="true" />
+                <span className="sr-only">Previous image</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => shiftImage("next")}
+                disabled={!hasMultipleImages}
+                className="flex h-10 w-10 items-center justify-center rounded-[10px] disabled:cursor-not-allowed disabled:opacity-35"
+                title="Next image"
+              >
+                <ChevronRight className="h-5 w-5" aria-hidden="true" />
+                <span className="sr-only">Next image</span>
+              </button>
+            </div>
           </div>
         </section>
 
@@ -1747,6 +2051,7 @@ function AccountFocusedListingOverlay({
           {panel === "details" ? (
             <AccountFocusedDetailsPanel
               listing={listing}
+              publicCoordinates={publicCoordinates}
               activeMode={activeMode}
               quote={quote}
               bookingQuantity={bookingQuantity}
@@ -1755,6 +2060,7 @@ function AccountFocusedListingOverlay({
               totalUnits={totalUnits}
               bookedUnits={bookedUnits}
               availableUnits={availableUnits}
+              setSelectedMode={setSelectedMode}
               onDm={onDm}
               proposeBooking={proposeBooking}
               completeBooking={completeBooking}
@@ -1777,6 +2083,7 @@ function AccountFocusedListingOverlay({
 
 function AccountFocusedDetailsPanel({
   listing,
+  publicCoordinates,
   activeMode,
   quote,
   bookingQuantity,
@@ -1785,12 +2092,14 @@ function AccountFocusedDetailsPanel({
   totalUnits,
   bookedUnits,
   availableUnits,
+  setSelectedMode,
   onDm,
   proposeBooking,
   completeBooking,
   booked
 }: {
   listing: ResourceListing;
+  publicCoordinates?: Coordinates;
   activeMode: OperationMode;
   quote: ReturnType<typeof calculateBookingQuote>;
   bookingQuantity: string;
@@ -1799,153 +2108,262 @@ function AccountFocusedDetailsPanel({
   totalUnits: number;
   bookedUnits: number;
   availableUnits: number;
+  setSelectedMode: (mode: OperationMode) => void;
   onDm: () => void;
   proposeBooking: () => void;
   completeBooking: () => void;
   booked: boolean;
 }) {
-  const quantityControlsDisabled = booked || availableUnits <= 0;
   const totalRental = quote.rentalFee.amount * selectedQuantity;
   const totalPlatform = quote.platformFee.amount * selectedQuantity;
   const totalDeposit = quote.deposit.amount * selectedQuantity;
   const totalDueNow = quote.totalDueNow.amount * selectedQuantity;
 
-  function updateBookingQuantity(nextValue: number) {
-    const maxQuantity = Math.max(1, availableUnits);
-    setBookingQuantity(String(Math.min(maxQuantity, Math.max(1, Math.floor(nextValue)))));
-  }
-
   return (
-    <section className="grid h-full min-h-0 min-w-0 content-start gap-4 overflow-y-auto overflow-x-hidden p-4">
-      <div>
-        <div className="flex flex-wrap gap-2 text-xs font-bold">
-          <span className="orbit-tag rounded-full bg-orbit-field px-3 py-1">{listing.location.county}</span>
-          <span className="orbit-tag rounded-full bg-orbit-field px-3 py-1">{listing.category}</span>
-          <span className="kind-tag orbit-tag rounded-full px-3 py-1" data-kind={listing.kind}>
-            {listingKindLabel(listing.kind)}
-          </span>
-          <span className="orbit-tag rounded-full bg-orbit-field px-3 py-1">{mobilityLabel(listingMobility(listing))}</span>
-          <span className="orbit-tag rounded-full bg-orbit-field px-3 py-1">{bookedUnitsLabel(bookedUnits, totalUnits)}</span>
-        </div>
-        <h2 className="mt-4 text-2xl font-black">{listing.title}</h2>
-        <p className="mt-2 text-sm leading-6 text-neutral-600">{listing.description}</p>
-      </div>
-
-      <div className="rounded-[28px] bg-orbit-soft/75 p-3">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h3 className="text-base font-black">Approximate</h3>
-            <p className="mt-1 text-xs font-semibold text-neutral-600">
-              {listing.location.generalArea}, {listing.location.county}
-            </p>
+    <section className="h-full min-h-0 min-w-0 overflow-y-auto overflow-x-hidden p-5">
+      <div className="grid gap-5">
+        <div>
+          <div className="flex flex-wrap items-center gap-2 text-[10px] font-black uppercase tracking-[0.04em]">
+            <span className="orbit-tag rounded-full bg-orbit-soft px-[15px] py-[7px]">{listing.location.county}</span>
+            <span className="orbit-tag rounded-full bg-orbit-soft px-[15px] py-[7px]">{listing.category}</span>
+            <span className="kind-tag orbit-tag rounded-full px-[15px] py-[7px]" data-kind={listing.kind}>
+              {listingKindLabel(listing.kind)}
+            </span>
+            <span className="orbit-tag rounded-full bg-orbit-soft px-[15px] py-[7px]">{mobilityLabel(listingMobility(listing))}</span>
+            <span className="orbit-tag ml-auto inline-flex min-h-9 shrink-0 items-center justify-center whitespace-nowrap rounded-full bg-orbit-soft px-[15px] py-[7px] text-orbit-ink">
+              {bookedUnitsLabel(bookedUnits, totalUnits)}
+            </span>
           </div>
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/70 text-orbit-green">
-            <MapPin className="h-5 w-5" aria-hidden="true" />
-          </span>
-        </div>
-        <div className="relative mt-3 h-36 overflow-hidden rounded-[26px] bg-orbit-line">
-          <div className="absolute inset-0 opacity-60 [background-image:linear-gradient(rgba(255,255,255,0.55)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.55)_1px,transparent_1px)] [background-size:28px_28px]" />
-          <span className="absolute left-1/2 top-1/2 flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-orbit-green text-orbit-field shadow-panel">
-            <MapPin className="h-6 w-6" aria-hidden="true" />
-          </span>
-        </div>
-      </div>
-
-      <div className="rounded-[24px] border border-orbit-line bg-orbit-field p-4 text-sm">
-        <p className="text-xs font-black uppercase text-orbit-ink/55">Booking mode</p>
-        <p className="mt-1 text-lg font-black text-orbit-green">{readableMode(activeMode)}</p>
-      </div>
-
-      <div className="min-w-0 rounded-[24px] border border-orbit-line bg-orbit-field p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-xs font-black uppercase text-orbit-ink/55">Booking quantity</p>
-            <p className="mt-1 text-sm font-semibold text-orbit-ink/60">
-              {availableUnits} available • {bookedUnitsLabel(bookedUnits, totalUnits)}
-            </p>
+          <div className="mt-4 grid grid-cols-[minmax(0,1fr)_auto] items-start gap-3">
+            <h2 className="min-w-0 text-[clamp(1.45rem,2vw,1.85rem)] font-black leading-tight text-orbit-ink">{listing.title}</h2>
+            <span className="inline-flex h-10 shrink-0 items-center gap-1 rounded-[12px] bg-orbit-soft px-3 text-sm font-black text-orbit-ink">
+              <Star className="h-4 w-4 fill-[#806A00] text-[#806A00]" aria-hidden="true" />
+              {listing.rating.toFixed(1)}
+            </span>
           </div>
-          <span className="rounded-full bg-orbit-panel px-3 py-2 text-xs font-black text-orbit-green">
-            Max {availableUnits}
-          </span>
+          <p className="mt-4 text-[clamp(0.95rem,1.2vw,1.08rem)] font-medium leading-7 text-[#403301] dark:text-orbit-ink/70">{listing.description}</p>
         </div>
-        <div className="mt-3 flex h-14 min-w-0 items-center rounded-full border border-orbit-line bg-orbit-panel p-[3px]">
+
+        <AccountApproximateLocationPanel listing={listing} publicCoordinates={publicCoordinates} />
+
+        <div>
+          <p className="mb-3 text-xs font-black uppercase tracking-[0.06em] text-[#403301] dark:text-orbit-ink/65">Booking mode</p>
+          <div className="grid min-w-0 gap-3 sm:grid-cols-2">
+            {listing.modeRules.map((rule) => (
+              <button
+                key={rule.mode}
+                type="button"
+                onClick={() => setSelectedMode(rule.mode)}
+                disabled={booked}
+                className={`min-h-16 rounded-[16px] px-4 py-3 text-sm font-black leading-tight transition-colors disabled:cursor-not-allowed disabled:opacity-55 ${
+                  activeMode === rule.mode
+                    ? "border-2 border-[#806A00] bg-orbit-panel text-[#806A00]"
+                    : "border border-[#806A00]/32 bg-orbit-panel text-orbit-ink"
+                }`}
+                title={rule.label}
+              >
+                {readableMode(rule.mode)}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <AccountBookingQuantityControl
+          quantityValue={bookingQuantity}
+          setQuantityValue={setBookingQuantity}
+          selectedQuantity={selectedQuantity}
+          totalUnits={totalUnits}
+          bookedUnits={bookedUnits}
+          availableUnits={availableUnits}
+          disabled={booked}
+        />
+
+        <AccountBillingPanel
+          listing={listing}
+          quote={quote}
+          selectedQuantity={selectedQuantity}
+          rental={totalRental}
+          platform={totalPlatform}
+          deposit={totalDeposit}
+          dueNow={totalDueNow}
+        />
+
+        <div className="grid grid-cols-2 gap-3">
           <button
             type="button"
-            onClick={() => updateBookingQuantity(selectedQuantity - 1)}
-            disabled={quantityControlsDisabled || selectedQuantity <= 1}
-            className="flex h-full aspect-square shrink-0 items-center justify-center rounded-full bg-orbit-soft text-lg font-black disabled:cursor-not-allowed disabled:opacity-35"
-            title="Decrease quantity"
-          >
-            -
-          </button>
-          <input
-            value={bookingQuantity}
-            onChange={(event) => {
-              if (!event.target.value) {
-                setBookingQuantity("");
-                return;
-              }
-
-              updateBookingQuantity(positiveInteger(event.target.value, 1));
-            }}
-            onBlur={() => updateBookingQuantity(positiveInteger(bookingQuantity, 1))}
-            disabled={quantityControlsDisabled}
-            type="text"
-            inputMode="numeric"
-            className="h-full min-w-0 flex-1 bg-transparent px-3 text-center text-lg font-black text-orbit-ink outline-none focus:outline-none focus:ring-0 focus-visible:outline-none disabled:opacity-50"
-          />
-          <button
-            type="button"
-            onClick={() => updateBookingQuantity(selectedQuantity + 1)}
-            disabled={quantityControlsDisabled || selectedQuantity >= availableUnits}
-            className="flex h-full aspect-square shrink-0 items-center justify-center rounded-full bg-orbit-green text-lg font-black text-orbit-field disabled:cursor-not-allowed disabled:grayscale disabled:opacity-35"
-            title="Increase quantity"
-          >
-            +
-          </button>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-2 border-y border-orbit-line py-3 text-sm">
-        <SummaryLine label="Rental" value={kes(totalRental)} />
-        <SummaryLine label="Platform" value={kes(totalPlatform)} />
-        <SummaryLine label="Deposit" value={kes(totalDeposit)} />
-        <SummaryLine label="Due now" value={kes(totalDueNow)} strong />
-      </div>
-
-      <div className="grid grid-cols-2 gap-2 text-sm">
-        <IconFact icon={<PackageCheck className="h-4 w-4" aria-hidden="true" />} label={listing.logistics.deliveryModes.join(", ")} />
-        <IconFact icon={<CalendarClock className="h-4 w-4" aria-hidden="true" />} label={`${selectedQuantity} item(s), ${quote.units} billed unit(s)`} />
-      </div>
-
-      <div className="grid gap-2">
-        <div className="grid grid-cols-2 gap-2">
-          <button
             onClick={onDm}
-            className="inline-flex items-center justify-center gap-2 rounded-full border border-orbit-line px-3 py-3 text-sm font-bold"
+            className="inline-flex min-h-16 items-center justify-center gap-2 rounded-full border border-orbit-line bg-orbit-panel px-4 text-base font-black text-orbit-ink"
           >
-            <MessageCircle className="h-4 w-4" aria-hidden="true" />
+            <MessageCircle className="h-5 w-5" aria-hidden="true" />
             DM
           </button>
           <button
+            type="button"
             onClick={proposeBooking}
             disabled={booked}
-            className="inline-flex items-center justify-center gap-2 rounded-full border border-orbit-line px-3 py-3 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-45"
+            className="orbit-cta-gold inline-flex min-h-16 items-center justify-center gap-2 rounded-full px-4 text-base font-black shadow-[0_14px_28px_rgba(239,191,4,0.2)] disabled:opacity-50"
           >
-            <FileSignature className="h-4 w-4" aria-hidden="true" />
+            <FileSignature className="h-5 w-5" aria-hidden="true" />
             Propose
           </button>
         </div>
+
         <button
+          type="button"
           onClick={completeBooking}
           disabled={booked}
-          className="inline-flex min-h-14 items-center justify-center gap-2 rounded-full bg-orbit-green px-4 text-sm font-black text-orbit-field disabled:cursor-not-allowed disabled:grayscale disabled:opacity-50"
+          className="orbit-cta-gold inline-flex min-h-14 items-center justify-center gap-2 rounded-full px-4 text-sm font-black disabled:opacity-50"
         >
           <PackageCheck className="h-4 w-4" aria-hidden="true" />
           {booked ? (availableUnits <= 0 ? "Unavailable" : "Already active") : `Complete ${selectedQuantity} item(s)`}
         </button>
       </div>
     </section>
+  );
+}
+
+function AccountApproximateLocationPanel({
+  listing,
+  publicCoordinates
+}: {
+  listing: ResourceListing;
+  publicCoordinates?: Coordinates;
+}) {
+  return (
+    <div className="marketplace-detail-surface rounded-[18px] p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-black uppercase tracking-[0.06em] text-[#403301] dark:text-orbit-ink/65">Approximate location</p>
+          <p className="mt-1 text-sm font-black text-orbit-ink">
+            {listing.location.generalArea}, {listing.location.county}
+          </p>
+        </div>
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-orbit-panel text-[#806A00] shadow-[0_8px_22px_rgba(25,32,29,0.1)]">
+          <MapPin className="h-5 w-5" aria-hidden="true" />
+        </span>
+      </div>
+      <div className="marketplace-map-surface relative mt-4 h-36 overflow-hidden rounded-[14px]">
+        <div className="absolute inset-0 opacity-70 [background-image:radial-gradient(circle,rgb(128_106_0_/_0.22)_1px,transparent_1.5px)] [background-size:18px_18px]" />
+        <div className="absolute left-[14%] top-[20%] h-20 w-28 rounded-full border border-white/45 bg-white/20" />
+        <div className="absolute bottom-[10%] right-[10%] h-24 w-32 rounded-full border border-white/35 bg-white/15" />
+        <span className="absolute left-1/2 top-1/2 flex h-11 w-11 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-orbit-panel shadow-[0_8px_22px_rgba(25,32,29,0.16)]">
+          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#806A00]" />
+        </span>
+        <span className="absolute bottom-3 left-4 rounded-full bg-orbit-panel/70 px-2 py-1 text-[10px] font-mono text-orbit-ink/75 backdrop-blur">
+          {publicCoordinates ? `${publicCoordinates.latitude}, ${publicCoordinates.longitude}` : "Approximate area"}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function AccountBookingQuantityControl({
+  quantityValue,
+  setQuantityValue,
+  selectedQuantity,
+  totalUnits,
+  bookedUnits,
+  availableUnits,
+  disabled
+}: {
+  quantityValue: string;
+  setQuantityValue: (value: string) => void;
+  selectedQuantity: number;
+  totalUnits: number;
+  bookedUnits: number;
+  availableUnits: number;
+  disabled: boolean;
+}) {
+  function updateQuantity(nextValue: number) {
+    const maxQuantity = Math.max(1, availableUnits);
+    setQuantityValue(String(Math.min(maxQuantity, Math.max(1, Math.floor(nextValue)))));
+  }
+
+  return (
+    <div className="min-w-0">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <p className="text-xs font-black uppercase tracking-[0.06em] text-[#403301] dark:text-orbit-ink/65">Booking quantity</p>
+        <span className="text-sm font-black text-orbit-ink/75">Max {availableUnits}</span>
+      </div>
+      <div className="flex h-16 min-w-0 items-center rounded-[14px] bg-orbit-panel p-[4px] shadow-[inset_0_0_0_1px_rgb(128_106_0_/_0.12)]">
+        <button
+          type="button"
+          onClick={() => updateQuantity(selectedQuantity - 1)}
+          disabled={disabled || availableUnits <= 0 || selectedQuantity <= 1}
+          className="flex h-full aspect-square shrink-0 items-center justify-center rounded-[10px] bg-orbit-soft text-2xl font-medium text-[#403301] disabled:cursor-not-allowed disabled:opacity-35 dark:text-orbit-ink"
+          title="Decrease quantity"
+        >
+          -
+        </button>
+        <input
+          value={quantityValue}
+          onChange={(event) => {
+            if (!event.target.value) {
+              setQuantityValue("");
+              return;
+            }
+
+            updateQuantity(positiveInteger(event.target.value, 1));
+          }}
+          onBlur={() => updateQuantity(positiveInteger(quantityValue, 1))}
+          disabled={disabled || availableUnits <= 0}
+          type="text"
+          inputMode="numeric"
+          className="h-full min-w-0 flex-1 bg-transparent px-3 text-center text-2xl font-black text-orbit-ink outline-none focus:outline-none focus:ring-0 focus-visible:outline-none disabled:opacity-50"
+        />
+        <button
+          type="button"
+          onClick={() => updateQuantity(selectedQuantity + 1)}
+          disabled={disabled || availableUnits <= 0 || selectedQuantity >= availableUnits}
+          className="orbit-cta-gold flex h-full aspect-square shrink-0 items-center justify-center rounded-[10px] text-3xl font-medium disabled:opacity-35"
+          title="Increase quantity"
+        >
+          +
+        </button>
+      </div>
+      <p className="mt-2 text-xs font-black text-orbit-ink/58">
+        {availableUnits} available • {bookedUnitsLabel(bookedUnits, totalUnits)}
+      </p>
+    </div>
+  );
+}
+
+function AccountBillingPanel({
+  listing,
+  quote,
+  selectedQuantity,
+  rental,
+  platform,
+  deposit,
+  dueNow
+}: {
+  listing: ResourceListing;
+  quote: ReturnType<typeof calculateBookingQuote>;
+  selectedQuantity: number;
+  rental: number;
+  platform: number;
+  deposit: number;
+  dueNow: number;
+}) {
+  return (
+    <div className="marketplace-detail-surface rounded-[22px] p-5">
+      <div className="grid grid-cols-2 gap-x-6 gap-y-5">
+        <SummaryLine label="Rental" value={kes(rental)} />
+        <SummaryLine label="Platform" value={kes(platform)} />
+        <SummaryLine label="Deposit" value={kes(deposit)} />
+        <SummaryLine label="Due now" value={kes(dueNow)} strong />
+      </div>
+      <div className="mt-5 grid gap-2 border-t border-[#403301]/10 pt-4 text-sm font-black text-[#403301] dark:border-white/10 dark:text-orbit-ink/75">
+        <div className="flex items-center gap-2">
+          <Truck className="h-4 w-4 shrink-0" aria-hidden="true" />
+          <span>{listing.logistics.deliveryModes.join(", ")} available</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <CalendarClock className="h-4 w-4 shrink-0" aria-hidden="true" />
+          <span>{selectedQuantity} item(s), {quote.units} billed unit(s)</span>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -1972,9 +2390,9 @@ function AccountFocusedChatPanel({
         <button
           type="button"
           onClick={backToDetails}
-          className="rounded-full bg-orbit-soft px-4 py-2 text-xs font-black"
+          className="rounded-full bg-orbit-clay px-4 py-2 text-xs font-black text-orbit-field transition-colors hover:opacity-90 dark:text-[#1a1a1a]"
         >
-          Details
+          Exit Chat
         </button>
       </div>
 
@@ -1995,7 +2413,7 @@ function AccountFocusedChatPanel({
       </div>
 
       <div className="theme-body-border border-t border-white/70 bg-orbit-panel p-4">
-        <div className="flex items-center gap-2 rounded-full border border-orbit-line bg-orbit-field p-[3px] focus-within:border-orbit-line focus-within:outline-none focus-within:ring-0">
+        <div className="flex items-center gap-2 rounded-full bg-orbit-field p-[3px] shadow-[inset_0_0_0_1px_rgb(255_255_255_/_0.18)] focus-within:outline-none focus-within:ring-0">
           <label className="flex h-12 w-12 shrink-0 cursor-pointer items-center justify-center rounded-full bg-orbit-panel text-orbit-ink" title="Add image">
             <Plus className="h-5 w-5" aria-hidden="true" />
             <span className="sr-only">Add image</span>
@@ -2011,7 +2429,7 @@ function AccountFocusedChatPanel({
             type="button"
             onClick={sendMessage}
             disabled={!draft.trim()}
-            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-orbit-green text-orbit-field disabled:cursor-not-allowed disabled:grayscale disabled:opacity-45"
+            className="orbit-cta-gold flex h-12 w-12 shrink-0 items-center justify-center rounded-full"
             title="Send message"
           >
             <Send className="h-5 w-5" aria-hidden="true" />
@@ -2243,7 +2661,7 @@ function FloatingChatWindow({
           </div>
 
           <div className="theme-body-border border-t border-white/70 bg-orbit-panel p-4">
-            <div className="flex items-center gap-2 rounded-full border border-orbit-line bg-orbit-field p-[3px] focus-within:border-orbit-line focus-within:outline-none focus-within:ring-0">
+            <div className="flex items-center gap-2 rounded-full bg-orbit-field p-[3px] shadow-[inset_0_0_0_1px_rgb(255_255_255_/_0.18)] focus-within:outline-none focus-within:ring-0">
               <label className="flex h-12 w-12 shrink-0 cursor-pointer items-center justify-center rounded-full bg-orbit-panel text-orbit-ink" title="Add image">
                 <Plus className="h-5 w-5" aria-hidden="true" />
                 <span className="sr-only">Add image</span>
@@ -2259,7 +2677,7 @@ function FloatingChatWindow({
                 type="button"
                 onClick={sendMessage}
                 disabled={!draft.trim()}
-                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-orbit-green text-orbit-field disabled:cursor-not-allowed disabled:grayscale disabled:opacity-45"
+                className="orbit-cta-gold flex h-12 w-12 shrink-0 items-center justify-center rounded-full"
                 title="Send message"
               >
                 <Send className="h-5 w-5" aria-hidden="true" />
@@ -2282,10 +2700,25 @@ function IconFact({ icon, label }: { icon: React.ReactNode; label: string }) {
 }
 
 function SummaryLine({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) {
+  const strongSizeClass = value.length > 12
+    ? "text-[clamp(1rem,1.8vw,1.32rem)] tracking-tight"
+    : value.length > 9
+      ? "text-[clamp(1.18rem,2.2vw,1.58rem)] tracking-tight"
+      : "text-[clamp(1.55rem,2.8vw,2.05rem)]";
+
   return (
-    <div>
-      <p className="text-xs font-semibold uppercase text-orbit-ink/55">{label}</p>
-      <p className={strong ? "font-black text-orbit-green" : "font-bold text-orbit-ink"}>{value}</p>
+    <div className="min-w-0">
+      <p className="text-xs font-black uppercase tracking-[0.06em] text-[#403301] dark:text-orbit-ink/60">{label}</p>
+      <p
+        className={
+          strong
+            ? `mt-1 max-w-full whitespace-nowrap font-black leading-none text-[#806A00] ${strongSizeClass}`
+            : "mt-1 max-w-full truncate text-base font-black text-orbit-ink"
+        }
+        title={value}
+      >
+        {value}
+      </p>
     </div>
   );
 }

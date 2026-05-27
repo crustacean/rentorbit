@@ -18,7 +18,7 @@ const themeInitScript = `
   const key = "rentorbit:theme-mode";
   const getSystemTheme = () => window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
   const applyTheme = (mode) => {
-    const normalized = mode === "light" || mode === "dark" || mode === "system" ? mode : "system";
+    const normalized = mode === "light" || mode === "dark" ? mode : "system";
     const resolved = normalized === "system" ? getSystemTheme() : normalized;
     document.documentElement.dataset.mode = normalized;
     document.documentElement.dataset.theme = resolved;

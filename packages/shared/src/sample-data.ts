@@ -1,3 +1,4 @@
+import { normalizeListingImageUrl } from "./listing-images.js";
 import type { ResourceListing } from "./types.js";
 
 type GeneratedListingSeed = {
@@ -782,7 +783,22 @@ function toGeneratedListing(seed: GeneratedListingSeed, index: number): Resource
   };
 }
 
-export const seededListings: ResourceListing[] = [
+function withPreparedListingMedia(listing: ResourceListing): ResourceListing {
+  return {
+    ...listing,
+    media: listing.media.map((media) => ({
+      ...media,
+      url: normalizeListingImageUrl(media.url)
+    })),
+    metadata: {
+      ...listing.metadata,
+      imageAspectRatio: "5:7",
+      imageCompressionQuality: 72
+    }
+  };
+}
+
+const baseSeededListings: ResourceListing[] = [
   {
     id: "lst_events_sound_nairobi_001",
     ownerId: "usr_owner_asha",
@@ -1025,3 +1041,5 @@ export const seededListings: ResourceListing[] = [
   },
   ...generatedListingSeeds.map(toGeneratedListing)
 ];
+
+export const seededListings: ResourceListing[] = baseSeededListings.map(withPreparedListingMedia);
