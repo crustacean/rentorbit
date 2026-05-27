@@ -194,8 +194,7 @@ export class IntelligenceService implements OnModuleInit {
       });
     }
 
-    const refinedQuery = await this.openAiClient.refineSearchNeed({ query, filters, messages });
-    const recommendations = this.recommend(refinedQuery, filters);
+    const recommendations = await this.recommend(query, filters, messages);
     const filterTags = buildSearchIntelligenceTags(recommendations);
 
     const session: SearchIntelligenceSession = {
@@ -274,12 +273,7 @@ export class IntelligenceService implements OnModuleInit {
     const combinedNeed = [nextQuery, ...needMessages, payloadKind === "search_update" ? input.message : ""]
       .filter(Boolean)
       .join(" ");
-    const refinedNeed = await this.openAiClient.refineSearchNeed({
-      query: combinedNeed,
-      filters: nextFilters,
-      messages: [...session.messages, userMessage]
-    });
-    const recommendations = this.recommend(refinedNeed, nextFilters);
+    const recommendations = await this.recommend(combinedNeed, nextFilters, [...session.messages, userMessage]);
     const filterTags = buildSearchIntelligenceTags(recommendations);
     const assistantMessage: SearchIntelligenceMessage = {
       role: "assistant",
@@ -316,7 +310,11 @@ export class IntelligenceService implements OnModuleInit {
     return session;
   }
 
-  private recommend(query: string, filters: SearchFilters): SearchIntelligenceRecommendation[] {
+  private async recommend(
+    query: string,
+    filters: SearchFilters,
+    messages: SearchIntelligenceMessage[]
+  ): Promise<SearchIntelligenceRecommendation[]> {
     const candidates = filterListings([...store.listings.values()], {
       ...filters,
       query: undefined
@@ -340,7 +338,72 @@ export class IntelligenceService implements OnModuleInit {
         .slice(0, 15);
     }
 
-    return rankListingsForNeed(query, candidates, profiles).slice(0, 15);
+    const localRecommendations = rankListingsForNeed(query, candidates, profiles).slice(0, 15);
+    const openAiCandidates = this.searchRankingCandidates(query, candidates, localRecommendations, profiles);
+    const openAiRecommendations = await this.openAiClient.rankListingsForSearch({
+      query,
+      filters,
+      messages,
+      candidates: openAiCandidates,
+      limit: 15
+    });
+
+    return openAiRecommendations ?? localRecommendations;
+  }
+
+  private searchRankingCandidates(
+    query: string,
+    candidates: ResourceListing[],
+    localRecommendations: SearchIntelligenceRecommendation[],
+    profiles: Map<string, ListingIntelligenceProfile>
+  ) {
+    const limit = this.searchCandidateLimit();
+    const localRecommendationsByListingId = new Map(localRecommendations.map((recommendation) => [recommendation.listingId, recommendation]));
+
+    if (candidates.length <= limit) {
+      return candidates.map((listing) => ({
+        listing,
+        profile: profiles.get(listing.id),
+        localRecommendation: localRecommendationsByListingId.get(listing.id)
+      }));
+    }
+
+    const selectedListingIds = new Set<string>();
+    const selectedListings: ResourceListing[] = [];
+
+    for (const recommendation of localRecommendations) {
+      const listing = candidates.find((candidate) => candidate.id === recommendation.listingId);
+
+      if (listing && !selectedListingIds.has(listing.id)) {
+        selectedListingIds.add(listing.id);
+        selectedListings.push(listing);
+      }
+
+      if (selectedListings.length >= limit) {
+        break;
+      }
+    }
+
+    for (const listing of candidates.sort((left, right) => right.rating * 100 + right.reviewCount - (left.rating * 100 + left.reviewCount))) {
+      if (!selectedListingIds.has(listing.id)) {
+        selectedListingIds.add(listing.id);
+        selectedListings.push(listing);
+      }
+
+      if (selectedListings.length >= limit) {
+        break;
+      }
+    }
+
+    this.logger.log(
+      `Search intelligence is sending ${selectedListings.length}/${candidates.length} filtered candidate profile(s) to OpenAI for "${query.slice(0, 80)}"`
+    );
+
+    return selectedListings.map((listing) => ({
+      listing,
+      profile: profiles.get(listing.id),
+      localRecommendation: localRecommendationsByListingId.get(listing.id)
+    }));
   }
 
   private createContainer(
@@ -383,6 +446,11 @@ export class IntelligenceService implements OnModuleInit {
   private sessionTtlMs(): number {
     const configured = Number(this.config.get<string>("INTELLIGENCE_SESSION_TTL_MS") ?? "60000");
     return Number.isFinite(configured) && configured >= 5_000 ? configured : 60_000;
+  }
+
+  private searchCandidateLimit(): number {
+    const configured = Number(this.config.get<string>("INTELLIGENCE_SEARCH_CANDIDATE_LIMIT") ?? "80");
+    return Number.isFinite(configured) && configured >= 10 ? Math.floor(configured) : 80;
   }
 
   private randomizedDelayMs(baseDelayMs = 400): number {

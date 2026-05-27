@@ -51,11 +51,21 @@ spec:
                 configMapKeyRef:
                   name: rentorbit-config
                   key: OPENAI_INTELLIGENCE_MODEL
+            - name: OPENAI_INTELLIGENCE_TIMEOUT_MS
+              valueFrom:
+                configMapKeyRef:
+                  name: rentorbit-config
+                  key: OPENAI_INTELLIGENCE_TIMEOUT_MS
             - name: INTELLIGENCE_SESSION_TTL_MS
               valueFrom:
                 configMapKeyRef:
                   name: rentorbit-config
                   key: INTELLIGENCE_SESSION_TTL_MS
+            - name: INTELLIGENCE_SEARCH_CANDIDATE_LIMIT
+              valueFrom:
+                configMapKeyRef:
+                  name: rentorbit-config
+                  key: INTELLIGENCE_SEARCH_CANDIDATE_LIMIT
             - name: INTELLIGENCE_PROFILE_DIR
               valueFrom:
                 configMapKeyRef:

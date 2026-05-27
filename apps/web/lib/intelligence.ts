@@ -2,6 +2,8 @@ import type { ListingLifecycleSignalType, SearchFilters, SearchIntelligenceSessi
 
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? "/api";
 const sessionStorageKey = "rentorbit:intelligence-search-session";
+const searchIntelligenceTimeoutMs = 8_000;
+const listingSignalTimeoutMs = 1_200;
 
 type StartSearchIntelligenceInput = {
   query: string;
@@ -46,7 +48,7 @@ export async function startSearchIntelligenceSession(input: StartSearchIntellige
   }
 
   const controller = new AbortController();
-  const timeout = window.setTimeout(() => controller.abort(), 900);
+  const timeout = window.setTimeout(() => controller.abort(), searchIntelligenceTimeoutMs);
 
   try {
     const response = await fetch(`${apiBaseUrl}/intelligence/search/sessions`, {
@@ -98,7 +100,7 @@ export async function recordListingIntelligenceSignal(
   }
 
   const controller = new AbortController();
-  const timeout = window.setTimeout(() => controller.abort(), 800);
+  const timeout = window.setTimeout(() => controller.abort(), listingSignalTimeoutMs);
 
   try {
     await fetch(`${apiBaseUrl}/intelligence/listings/${encodeURIComponent(listingId)}/signals`, {
@@ -124,7 +126,7 @@ async function continueSearchIntelligenceSession(
   input: SearchConversationInput
 ): Promise<SearchIntelligenceSession | null> {
   const controller = new AbortController();
-  const timeout = window.setTimeout(() => controller.abort(), 900);
+  const timeout = window.setTimeout(() => controller.abort(), searchIntelligenceTimeoutMs);
 
   try {
     const response = await fetch(`${apiBaseUrl}/intelligence/search/sessions/${encodeURIComponent(sessionId)}/messages`, {
