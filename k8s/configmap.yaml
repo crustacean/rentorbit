@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rentorbit-config
+  namespace: ${KUBE_NAMESPACE}
+  labels:
+    app.kubernetes.io/name: rentorbit
+    app.kubernetes.io/part-of: rentorbit
+data:
+  NODE_ENV: "production"
+  WEB_PORT: "3000"
+  API_PORT: "4000"
+  APP_URL: "${APP_URL}"
+  NEXT_PUBLIC_API_URL: "${NEXT_PUBLIC_API_URL}"
+  API_INTERNAL_URL: "${API_INTERNAL_URL}"

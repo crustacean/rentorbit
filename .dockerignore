@@ -1,0 +1,13 @@
+node_modules
+npm-debug.log*
+.next
+apps/web/.next
+apps/api/dist
+packages/shared/dist
+.git
+.gitignore
+.env
+.env.*
+prepared-*.yaml
+coverage
+.DS_Store

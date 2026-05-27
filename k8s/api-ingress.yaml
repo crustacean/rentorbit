@@ -1,0 +1,23 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: rentorbit-api
+  namespace: ${KUBE_NAMESPACE}
+  labels:
+    app.kubernetes.io/name: rentorbit-api
+    app.kubernetes.io/part-of: rentorbit
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /${API_REWRITE_TARGET}
+spec:
+  ingressClassName: ${INGRESS_CLASS}
+  rules:
+    - host: ${INGRESS_HOST}
+      http:
+        paths:
+          - path: /api(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: rentorbit-api
+                port:
+                  number: 4000

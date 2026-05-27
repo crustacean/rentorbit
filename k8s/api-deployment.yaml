@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rentorbit-api
+  namespace: ${KUBE_NAMESPACE}
+  labels:
+    app.kubernetes.io/name: rentorbit-api
+    app.kubernetes.io/part-of: rentorbit
+spec:
+  replicas: ${API_REPLICAS}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: rentorbit-api
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: rentorbit-api
+        app.kubernetes.io/part-of: rentorbit
+    spec:
+      containers:
+        - name: api
+          image: ${API_IMAGE}
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 4000
+          env:
+            - name: NODE_ENV
+              valueFrom:
+                configMapKeyRef:
+                  name: rentorbit-config
+                  key: NODE_ENV
+            - name: PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: rentorbit-config
+                  key: API_PORT
+            - name: APP_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: rentorbit-config
+                  key: APP_URL
+          readinessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
