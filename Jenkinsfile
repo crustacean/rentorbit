@@ -9,6 +9,7 @@ pipeline {
         IMAGE_TAG = "${env.BUILD_NUMBER}"
 
         DOCKER_CREDENTIALS = 'docker-hub-credentials'
+        OPENAI_API_KEY_CREDENTIALS = 'openai-api-key'
 
         KUBE_CLUSTER = 'minikube'
         KUBE_CONTEXT = 'minikube'

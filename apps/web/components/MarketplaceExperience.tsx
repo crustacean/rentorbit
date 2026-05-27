@@ -3,9 +3,7 @@
 import {
   ArrowUpRight,
   CalendarClock,
-  ChevronLeft,
   ChevronRight,
-  ChevronDown,
   Compass,
   FileSignature,
   Filter,
@@ -17,18 +15,16 @@ import {
   PackageCheck,
   Search,
   SearchX,
-  Send,
   Star,
   Truck,
   UserRoundCheck,
-  ZoomIn,
-  ZoomOut,
   X
 } from "lucide-react";
 import { CustomSelect, type CustomSelectOption } from "@/components/CustomSelect";
 import { SiteHeader } from "@/components/SiteHeader";
 import { AuthModal, type AccountMode } from "@/components/AuthModal";
 import { readAccountSession } from "@/lib/accountSession";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import {
   calculateBookingQuote,
@@ -45,7 +41,32 @@ import {
   type ResourceListing,
   type SearchResult
 } from "@rentorbit/shared";
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+
+const DateInput = dynamic(
+  () => import("@/components/MarketplaceDateInput").then((module) => module.DateInput),
+  {
+    loading: () => (
+      <div className="grid gap-1">
+        <span className="h-4 w-16 rounded-full bg-orbit-soft/70" />
+        <span className="h-10 rounded-[18px] bg-orbit-panel shadow-[inset_0_0_0_1px_rgb(255_255_255_/_0.22)]" />
+      </div>
+    )
+  }
+);
+
+const FocusedListingOverlay = dynamic(
+  () => import("@/components/MarketplaceFocusedOverlay").then((module) => module.FocusedListingOverlay),
+  {
+    loading: () => (
+      <div className="fixed inset-0 z-[80] grid place-items-center bg-orbit-field/92 p-5 text-orbit-ink">
+        <div className="rounded-full bg-orbit-panel px-5 py-3 text-sm font-black shadow-[0_18px_42px_rgba(25,32,29,0.14)]">
+          Opening listing...
+        </div>
+      </div>
+    )
+  }
+);
 
 const countyOrigins: Record<string, Coordinates> = {
   Nairobi: { latitude: -1.286389, longitude: 36.817223 },
@@ -148,6 +169,28 @@ function listingKindLabel(kind: ResourceListing["kind"]) {
 function positiveInteger(value: string | number, fallback = 1): number {
   const parsed = typeof value === "number" ? value : Number.parseInt(value, 10);
   return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback;
+}
+
+function marketplaceThumbnailUrl(url: string, width: number, height: number): string {
+  let parsedUrl: URL;
+
+  try {
+    parsedUrl = new URL(url);
+  } catch {
+    return url;
+  }
+
+  if (!parsedUrl.hostname.includes("images.unsplash.com")) {
+    return url;
+  }
+
+  parsedUrl.searchParams.set("auto", "format");
+  parsedUrl.searchParams.set("fit", "crop");
+  parsedUrl.searchParams.set("w", String(width));
+  parsedUrl.searchParams.set("h", String(height));
+  parsedUrl.searchParams.set("q", "58");
+
+  return parsedUrl.toString();
 }
 
 function bookedUnitsLabel(bookedCount: number, totalCount: number): string {
@@ -942,6 +985,7 @@ function EmptyRecommendationCard({
 }) {
   const listing = result.listing;
   const media = listing.media[0];
+  const thumbnailUrl = media ? marketplaceThumbnailUrl(media.url, 640, 400) : undefined;
   const rule = listing.modeRules[0];
   const rate = rule?.pricing.rate.amount ?? 0;
   const metric = rule?.pricing.billingMetric ?? "daily";
@@ -954,10 +998,14 @@ function EmptyRecommendationCard({
     >
       <button type="button" onClick={onSelect} className="block w-full text-left focus-visible:outline-none">
         <div className="relative aspect-[16/10] overflow-hidden bg-orbit-soft">
-          {media ? (
+          {thumbnailUrl ? (
             <img
-              src={media.url}
-              alt={media.alt || listing.title}
+              src={thumbnailUrl}
+              alt={media?.alt || listing.title}
+              loading="lazy"
+              decoding="async"
+              width={640}
+              height={400}
               className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
             />
           ) : null}
@@ -1443,340 +1491,6 @@ function BillingPanel({
   );
 }
 
-function FocusedListingOverlay({
-  listing,
-  gallery,
-  image,
-  imageIndex,
-  setImageIndex,
-  zoom,
-  setZoom,
-  activeMode,
-  quote,
-  bookingQuantity,
-  setBookingQuantity,
-  selectedQuantity,
-  totalUnits,
-  bookedUnits,
-  availableUnits,
-  publicCoordinates,
-  setSelectedMode,
-  panel,
-  setPanel,
-  thread,
-  draft,
-  setDraft,
-  sendMessage,
-  onDm,
-  proposeBooking,
-  onClose
-}: {
-  listing: ResourceListing;
-  gallery: ResourceListing["media"];
-  image?: ResourceListing["media"][number];
-  imageIndex: number;
-  setImageIndex: React.Dispatch<React.SetStateAction<number>>;
-  zoom: number;
-  setZoom: React.Dispatch<React.SetStateAction<number>>;
-  activeMode: OperationMode;
-  quote: ReturnType<typeof calculateBookingQuote>;
-  bookingQuantity: string;
-  setBookingQuantity: (value: string) => void;
-  selectedQuantity: number;
-  totalUnits: number;
-  bookedUnits: number;
-  availableUnits: number;
-  publicCoordinates?: Coordinates;
-  setSelectedMode: (mode: OperationMode) => void;
-  panel: FocusedPanel;
-  setPanel: (panel: FocusedPanel) => void;
-  thread: AccountChatThread;
-  draft: string;
-  setDraft: (value: string) => void;
-  sendMessage: () => void;
-  onDm: () => void;
-  proposeBooking: () => void;
-  onClose: () => void;
-}) {
-  const hasMultipleImages = gallery.length > 1;
-
-  function shiftImage(direction: "previous" | "next") {
-    if (!gallery.length) {
-      return;
-    }
-
-    setZoom(1);
-    setImageIndex((current) => {
-      if (direction === "previous") {
-        return current === 0 ? gallery.length - 1 : current - 1;
-      }
-
-      return current === gallery.length - 1 ? 0 : current + 1;
-    });
-  }
-
-  function updateZoom(nextZoom: number) {
-    setZoom(Math.min(2.5, Math.max(1, nextZoom)));
-  }
-
-  return (
-    <div className="fixed inset-0 z-[80] bg-orbit-field p-3 text-orbit-ink sm:p-5" role="dialog" aria-modal="true" aria-label={listing.title}>
-      <div className="relative grid h-full min-w-0 overflow-hidden rounded-[34px] border-2 border-[#4391F5] bg-orbit-panel shadow-[0_24px_70px_rgba(25,32,29,0.18)] lg:grid-cols-[minmax(0,65fr)_minmax(0,35fr)]">
-          <section className="relative min-h-[52svh] overflow-hidden bg-orbit-field p-5 sm:p-8 lg:min-h-0">
-            <button
-              type="button"
-              onClick={onClose}
-              className="absolute left-5 top-5 z-30 flex h-16 w-16 items-center justify-center rounded-full bg-orbit-panel text-orbit-ink shadow-[0_12px_30px_rgba(25,32,29,0.18)] transition-colors hover:bg-orbit-soft"
-              title="Close"
-            >
-              <X className="h-8 w-8" aria-hidden="true" />
-              <span className="sr-only">Close focused listing</span>
-            </button>
-
-            <div className="flex h-full w-full items-center justify-center overflow-hidden rounded-[26px] bg-orbit-field">
-              {image ? (
-                <img
-                  src={image.url}
-                  alt={image.alt || listing.title}
-                  className="max-h-full max-w-full select-none object-contain transition-transform duration-200 ease-out"
-                  style={{ transform: `scale(${zoom})`, transformOrigin: "center center" }}
-                />
-              ) : null}
-            </div>
-
-            <div className="absolute bottom-8 right-8 z-20 flex flex-wrap justify-end gap-3">
-              <div className="flex h-12 items-center rounded-[14px] bg-orbit-panel p-1 text-orbit-ink shadow-[0_10px_24px_rgba(25,32,29,0.12)]">
-                <button
-                  type="button"
-                  onClick={() => updateZoom(zoom - 0.2)}
-                  disabled={zoom <= 1}
-                  className="flex h-10 w-10 items-center justify-center rounded-[10px] disabled:cursor-not-allowed disabled:opacity-35"
-                  title="Zoom out"
-                >
-                  <ZoomOut className="h-4 w-4" aria-hidden="true" />
-                  <span className="sr-only">Zoom out</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => updateZoom(zoom + 0.2)}
-                  disabled={zoom >= 2.5}
-                  className="flex h-10 w-10 items-center justify-center rounded-[10px] disabled:cursor-not-allowed disabled:opacity-35"
-                  title="Zoom in"
-                >
-                  <ZoomIn className="h-4 w-4" aria-hidden="true" />
-                  <span className="sr-only">Zoom in</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setZoom(1)}
-                  className="h-10 rounded-[10px] px-3 text-xs font-black"
-                  title="Reset zoom"
-                >
-                  {Math.round(zoom * 100)}%
-                </button>
-              </div>
-
-              <div className="flex h-12 items-center rounded-[14px] bg-orbit-panel p-1 text-orbit-ink shadow-[0_10px_24px_rgba(25,32,29,0.12)]">
-                <button
-                  type="button"
-                  onClick={() => shiftImage("previous")}
-                  disabled={!hasMultipleImages}
-                  className="flex h-10 w-10 items-center justify-center rounded-[10px] disabled:cursor-not-allowed disabled:opacity-35"
-                  title="Previous image"
-                >
-                  <ChevronLeft className="h-5 w-5" aria-hidden="true" />
-                  <span className="sr-only">Previous image</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => shiftImage("next")}
-                  disabled={!hasMultipleImages}
-                  className="flex h-10 w-10 items-center justify-center rounded-[10px] disabled:cursor-not-allowed disabled:opacity-35"
-                  title="Next image"
-                >
-                  <ChevronRight className="h-5 w-5" aria-hidden="true" />
-                  <span className="sr-only">Next image</span>
-                </button>
-              </div>
-            </div>
-          </section>
-
-          <aside className="min-h-0 min-w-0 overflow-hidden bg-orbit-panel">
-          {panel === "details" ? (
-            <FocusedDetailsPanel
-              listing={listing}
-              publicCoordinates={publicCoordinates}
-              activeMode={activeMode}
-              quote={quote}
-              bookingQuantity={bookingQuantity}
-              setBookingQuantity={setBookingQuantity}
-              selectedQuantity={selectedQuantity}
-              totalUnits={totalUnits}
-              bookedUnits={bookedUnits}
-              availableUnits={availableUnits}
-              setSelectedMode={setSelectedMode}
-              onDm={onDm}
-              proposeBooking={proposeBooking}
-            />
-          ) : (
-            <FocusedChatPanel
-              thread={thread}
-              draft={draft}
-              setDraft={setDraft}
-              sendMessage={sendMessage}
-              backToDetails={() => setPanel("details")}
-            />
-          )}
-          </aside>
-      </div>
-    </div>
-  );
-}
-
-function FocusedDetailsPanel({
-  listing,
-  publicCoordinates,
-  activeMode,
-  quote,
-  bookingQuantity,
-  setBookingQuantity,
-  selectedQuantity,
-  totalUnits,
-  bookedUnits,
-  availableUnits,
-  setSelectedMode,
-  onDm,
-  proposeBooking
-}: {
-  listing: ResourceListing;
-  publicCoordinates?: Coordinates;
-  activeMode: OperationMode;
-  quote: ReturnType<typeof calculateBookingQuote>;
-  bookingQuantity: string;
-  setBookingQuantity: (value: string) => void;
-  selectedQuantity: number;
-  totalUnits: number;
-  bookedUnits: number;
-  availableUnits: number;
-  setSelectedMode: (mode: OperationMode) => void;
-  onDm: () => void;
-  proposeBooking: () => void;
-}) {
-  return (
-    <section className="h-full min-h-0 min-w-0 overflow-y-auto overflow-x-hidden p-5">
-      <BookingDetailsContent
-        listing={listing}
-        publicCoordinates={publicCoordinates}
-        activeMode={activeMode}
-        quote={quote}
-        bookingQuantity={bookingQuantity}
-        setBookingQuantity={setBookingQuantity}
-        selectedQuantity={selectedQuantity}
-        totalUnits={totalUnits}
-        bookedUnits={bookedUnits}
-        availableUnits={availableUnits}
-        setSelectedMode={setSelectedMode}
-        onDm={onDm}
-        proposeBooking={proposeBooking}
-      />
-    </section>
-  );
-}
-
-function FocusedChatPanel({
-  thread,
-  draft,
-  setDraft,
-  sendMessage,
-  backToDetails
-}: {
-  thread: AccountChatThread;
-  draft: string;
-  setDraft: (value: string) => void;
-  sendMessage: () => void;
-  backToDetails: () => void;
-}) {
-  return (
-    <section className="grid h-full min-h-[45svh] grid-rows-[auto_minmax(0,1fr)_auto] bg-[#ffffff] dark:bg-[#000000]">
-      <div className="theme-body-border flex min-h-16 items-center justify-between gap-3 border-b border-white/70 bg-orbit-panel/95 px-4">
-        <div className="min-w-0">
-          <h2 className="truncate text-base font-black">{thread.participant}</h2>
-          <p className="truncate text-xs font-semibold text-orbit-ink/60">{thread.listing}</p>
-        </div>
-        <button
-          type="button"
-          onClick={backToDetails}
-          className="rounded-full bg-orbit-clay px-4 py-2 text-xs font-black text-orbit-field transition-colors hover:opacity-90 dark:text-[#1a1a1a]"
-        >
-          Exit Chat
-        </button>
-      </div>
-
-      <div className="chat-thread-body overflow-y-auto bg-[#ffffff] p-4">
-        <div className="grid gap-3">
-          {thread.messages.map((message) => (
-            <div
-              key={message.id}
-              className={`max-w-[82%] rounded-[24px] px-4 py-3 text-sm font-semibold leading-6 ${
-                message.author === "me" ? "ml-auto bg-[#07777a] text-white" : "mr-auto bg-[#2a2836] text-white"
-              }`}
-            >
-              <p>{message.text}</p>
-              <p className="mt-1 text-[10px] font-black uppercase text-white/60">{message.time}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="theme-body-border border-t border-white/70 bg-orbit-panel p-4">
-        <div className="flex items-center gap-2 rounded-full bg-orbit-field p-[3px] shadow-[inset_0_0_0_1px_rgb(255_255_255_/_0.18)] focus-within:outline-none focus-within:ring-0">
-          <textarea
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            rows={1}
-            className="chat-composer-field max-h-24 min-h-12 min-w-0 flex-1 resize-none rounded-[22px] px-4 py-3 text-sm font-bold text-orbit-ink outline-none focus:outline-none focus:ring-0 focus-visible:outline-none"
-          />
-          <button
-            type="button"
-            onClick={sendMessage}
-            disabled={!draft.trim()}
-            className="orbit-cta-gold flex h-12 w-12 shrink-0 items-center justify-center rounded-full"
-            title="Send message"
-          >
-            <Send className="h-5 w-5" aria-hidden="true" />
-          </button>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function FilterSelect({
-  label,
-  value,
-  onChange,
-  options
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  options: CustomSelectOption[];
-}) {
-  return (
-    <CustomSelect
-      label={label}
-      value={value}
-      onChange={onChange}
-      options={options}
-      labelClassName="mb-1 block text-xs font-semibold uppercase text-neutral-500"
-      buttonClassName="flex min-h-10 w-full items-center gap-3 rounded-[18px] bg-orbit-panel py-2 pl-3 pr-2 text-left text-sm text-orbit-ink outline-none shadow-[inset_0_0_0_1px_rgb(255_255_255_/_0.22)] transition hover:bg-orbit-soft/45 focus:outline-none focus:ring-0 focus-visible:outline-none"
-    />
-  );
-}
-
-const monthLabels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-const weekdayLabels = ["S", "M", "T", "W", "T", "F", "S"];
-
 function padDatePart(value: number) {
   return String(value).padStart(2, "0");
 }
@@ -1825,244 +1539,26 @@ function normalizeFilterWindow(current: FilterState, next: Partial<FilterState>)
   return { ...merged, end: formatDateTimeValue(adjustedEnd) };
 }
 
-function formatDateTimeLabel(date: Date) {
-  const hour = date.getHours();
-  const displayHour = hour % 12 || 12;
-  const period = hour >= 12 ? "PM" : "AM";
-
-  return `${monthLabels[date.getMonth()]} ${padDatePart(date.getDate())}, ${date.getFullYear()}, ${padDatePart(displayHour)}:${padDatePart(date.getMinutes())} ${period}`;
-}
-
-function sameCalendarDay(left: Date, right: Date) {
-  return (
-    left.getFullYear() === right.getFullYear() &&
-    left.getMonth() === right.getMonth() &&
-    left.getDate() === right.getDate()
-  );
-}
-
-function DateInput({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
-  const [open, setOpen] = useState(false);
-  const selectedDate = useMemo(() => parseDateTimeValue(value), [value]);
-  const [viewDate, setViewDate] = useState(() => new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1));
-  const wrapperRef = useRef<HTMLDivElement | null>(null);
-  const buttonId = useId();
-  const menuId = useId();
-
-  useEffect(() => {
-    if (open) {
-      setViewDate(new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1));
-    }
-  }, [open, selectedDate]);
-
-  useEffect(() => {
-    if (!open) {
-      return;
-    }
-
-    function handlePointerDown(event: PointerEvent) {
-      if (!wrapperRef.current?.contains(event.target as Node)) {
-        setOpen(false);
-      }
-    }
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        setOpen(false);
-      }
-    }
-
-    document.addEventListener("pointerdown", handlePointerDown);
-    window.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      document.removeEventListener("pointerdown", handlePointerDown);
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [open]);
-
-  const calendarDays = useMemo(() => {
-    const firstDay = new Date(viewDate.getFullYear(), viewDate.getMonth(), 1);
-    const gridStart = new Date(firstDay);
-    gridStart.setDate(firstDay.getDate() - firstDay.getDay());
-
-    return Array.from({ length: 42 }, (_, index) => {
-      const day = new Date(gridStart);
-      day.setDate(gridStart.getDate() + index);
-      return day;
-    });
-  }, [viewDate]);
-
-  function moveMonth(delta: number) {
-    setViewDate((current) => new Date(current.getFullYear(), current.getMonth() + delta, 1));
-  }
-
-  function selectDay(day: Date) {
-    onChange(formatDateTimeValue(new Date(day.getFullYear(), day.getMonth(), day.getDate(), selectedDate.getHours(), selectedDate.getMinutes())));
-    setViewDate(new Date(day.getFullYear(), day.getMonth(), 1));
-  }
-
-  function adjustHour(delta: number) {
-    const next = new Date(selectedDate);
-    next.setHours((selectedDate.getHours() + delta + 24) % 24);
-    onChange(formatDateTimeValue(next));
-  }
-
-  function adjustMinute(delta: number) {
-    const totalMinutes = selectedDate.getHours() * 60 + selectedDate.getMinutes();
-    const nextTotal = (totalMinutes + delta * 5 + 24 * 60) % (24 * 60);
-    const next = new Date(selectedDate);
-    next.setHours(Math.floor(nextTotal / 60), nextTotal % 60);
-    onChange(formatDateTimeValue(next));
-  }
-
-  function selectToday() {
-    const now = new Date();
-    onChange(formatDateTimeValue(new Date(now.getFullYear(), now.getMonth(), now.getDate(), selectedDate.getHours(), selectedDate.getMinutes())));
-    setViewDate(new Date(now.getFullYear(), now.getMonth(), 1));
-  }
-
-  return (
-    <div ref={wrapperRef} className="relative block">
-      <span id={`${buttonId}-label`} className="mb-1 block text-xs font-semibold uppercase text-neutral-500">
-        {label}
-      </span>
-      <button
-        id={buttonId}
-        type="button"
-        onClick={() => setOpen((current) => !current)}
-        className="flex min-h-10 w-full items-center gap-3 rounded-[18px] bg-orbit-panel py-2 pl-3 pr-2 text-left text-sm text-orbit-ink outline-none shadow-[inset_0_0_0_1px_rgb(255_255_255_/_0.22)] transition hover:bg-orbit-soft/45 focus:outline-none focus:ring-0 focus-visible:outline-none"
-        aria-haspopup="dialog"
-        aria-expanded={open}
-        aria-controls={menuId}
-        aria-labelledby={`${buttonId}-label ${buttonId}`}
-      >
-        <span className="flex h-full aspect-square shrink-0 items-center justify-center rounded-full bg-orbit-field text-orbit-green">
-          <CalendarClock className="h-4 w-4" aria-hidden="true" />
-        </span>
-        <span className="min-w-0 flex-1 truncate">{formatDateTimeLabel(selectedDate)}</span>
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-orbit-panel/75 text-orbit-ink">
-          <ChevronDown className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`} aria-hidden="true" />
-        </span>
-      </button>
-
-      {open ? (
-        <div
-          id={menuId}
-          role="dialog"
-          aria-labelledby={`${buttonId}-label`}
-          className="absolute left-0 right-0 top-[calc(100%+8px)] z-[90] overflow-hidden rounded-[24px] bg-orbit-panel p-2 shadow-[0_18px_42px_rgba(25,32,29,0.14)]"
-        >
-          <div className="flex items-center justify-between gap-2 px-1 py-1">
-            <button
-              type="button"
-              onClick={() => moveMonth(-1)}
-              className="flex h-10 w-10 items-center justify-center rounded-full bg-orbit-field text-orbit-ink transition-colors hover:bg-orbit-soft"
-              aria-label="Previous month"
-            >
-              <ChevronLeft className="h-4 w-4" aria-hidden="true" />
-            </button>
-            <p className="text-sm font-black text-orbit-ink">
-              {monthLabels[viewDate.getMonth()]} {viewDate.getFullYear()}
-            </p>
-            <button
-              type="button"
-              onClick={() => moveMonth(1)}
-              className="flex h-10 w-10 items-center justify-center rounded-full bg-orbit-field text-orbit-ink transition-colors hover:bg-orbit-soft"
-              aria-label="Next month"
-            >
-              <ChevronRight className="h-4 w-4" aria-hidden="true" />
-            </button>
-          </div>
-
-          <div className="mt-2 grid grid-cols-7 gap-1 px-1 text-center text-[11px] font-black uppercase text-orbit-ink/55">
-            {weekdayLabels.map((weekday, index) => (
-              <span key={`${weekday}-${index}`} className="py-1">
-                {weekday}
-              </span>
-            ))}
-          </div>
-
-          <div className="mt-1 grid grid-cols-7 gap-1">
-            {calendarDays.map((day) => {
-              const selected = sameCalendarDay(day, selectedDate);
-              const outsideMonth = day.getMonth() !== viewDate.getMonth();
-
-              return (
-                <button
-                  key={formatDateTimeValue(day)}
-                  type="button"
-                  onClick={() => selectDay(day)}
-                  className={`relative mx-auto flex h-9 w-9 items-center justify-center rounded-full text-xs font-black transition-colors ${
-                    selected ? "bg-[#EFBF04] text-[#1a1a1a] hover:bg-[#EFBF04]" : "bg-transparent text-orbit-ink hover:bg-orbit-field"
-                  } ${outsideMonth && !selected ? "opacity-35" : ""}`}
-                  aria-pressed={selected}
-                >
-                  {day.getDate()}
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="mt-3 grid gap-2 rounded-[18px] bg-orbit-field p-2">
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-xs font-black uppercase text-orbit-ink/55">Time</span>
-              <span className="rounded-full bg-orbit-panel px-3 py-1 text-xs font-black text-orbit-ink">
-                {formatDateTimeLabel(selectedDate).split(", ").at(-1)}
-              </span>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <TimeStepper label="Hour" value={padDatePart(selectedDate.getHours())} onDecrement={() => adjustHour(-1)} onIncrement={() => adjustHour(1)} />
-              <TimeStepper label="Minute" value={padDatePart(selectedDate.getMinutes())} onDecrement={() => adjustMinute(-1)} onIncrement={() => adjustMinute(1)} />
-            </div>
-          </div>
-
-          <div className="mt-2 flex items-center justify-between gap-2">
-            <button
-              type="button"
-              onClick={selectToday}
-              className="flex min-h-10 items-center justify-center rounded-full bg-orbit-field px-4 text-xs font-black text-orbit-ink transition-colors hover:bg-orbit-soft"
-            >
-              Today
-            </button>
-            <button
-              type="button"
-              onClick={() => setOpen(false)}
-              className="orbit-cta-gold flex min-h-10 items-center justify-center rounded-full px-5 text-xs font-black transition-colors"
-            >
-              Done
-            </button>
-          </div>
-        </div>
-      ) : null}
-    </div>
-  );
-}
-
-function TimeStepper({
+function FilterSelect({
   label,
   value,
-  onDecrement,
-  onIncrement
+  onChange,
+  options
 }: {
   label: string;
   value: string;
-  onDecrement: () => void;
-  onIncrement: () => void;
+  onChange: (value: string) => void;
+  options: CustomSelectOption[];
 }) {
   return (
-    <div className="rounded-[16px] bg-orbit-panel p-1">
-      <span className="block px-2 pb-1 text-[10px] font-black uppercase text-orbit-ink/55">{label}</span>
-      <div className="flex h-10 items-center rounded-full bg-orbit-field p-[1px] shadow-[inset_0_0_0_1px_rgb(255_255_255_/_0.18)]">
-        <button type="button" onClick={onDecrement} className="flex h-full aspect-square shrink-0 items-center justify-center rounded-full bg-orbit-panel text-sm font-black text-orbit-ink">
-          -
-        </button>
-        <span className="min-w-0 flex-1 text-center text-sm font-black text-orbit-ink">{value}</span>
-        <button type="button" onClick={onIncrement} className="orbit-cta-gold flex h-full aspect-square shrink-0 items-center justify-center rounded-full text-sm font-black">
-          +
-        </button>
-      </div>
-    </div>
+    <CustomSelect
+      label={label}
+      value={value}
+      onChange={onChange}
+      options={options}
+      labelClassName="mb-1 block text-xs font-semibold uppercase text-neutral-500"
+      buttonClassName="flex min-h-10 w-full items-center gap-3 rounded-[18px] bg-orbit-panel py-2 pl-3 pr-2 text-left text-sm text-orbit-ink outline-none shadow-[inset_0_0_0_1px_rgb(255_255_255_/_0.22)] transition hover:bg-orbit-soft/45 focus:outline-none focus:ring-0 focus-visible:outline-none"
+    />
   );
 }
 
@@ -2083,6 +1579,7 @@ function MarketplaceListingCard({
 }) {
   const listing = result.listing;
   const media = listing.media[0];
+  const thumbnailUrl = media ? marketplaceThumbnailUrl(media.url, 640, 360) : undefined;
   const rate = kes(listing.modeRules[0]?.pricing.rate.amount ?? 0);
   const unavailable = result.availabilityState === "unavailable_for_window";
 
@@ -2132,11 +1629,18 @@ function MarketplaceListingCard({
       </div>
 
       <div className="relative isolate mt-4 aspect-[16/9] min-h-[170px] self-stretch overflow-hidden rounded-[26px] bg-orbit-soft md:mt-0 md:h-full md:min-h-[clamp(180px,14vw,240px)] md:aspect-auto">
-        <img
-          src={media?.url}
-          alt={media?.alt ?? listing.title}
-          className={`absolute inset-0 z-0 h-full w-full object-cover ${unavailable ? "grayscale" : ""}`}
-        />
+        {thumbnailUrl ? (
+          <img
+            src={thumbnailUrl}
+            alt={media?.alt ?? listing.title}
+            loading={selected ? "eager" : "lazy"}
+            decoding="async"
+            fetchPriority={selected ? "high" : "low"}
+            width={640}
+            height={360}
+            className={`absolute inset-0 z-0 h-full w-full object-cover ${unavailable ? "grayscale" : ""}`}
+          />
+        ) : null}
         <button
           type="button"
           onClick={(event) => {
