@@ -11,3 +11,6 @@ pnpm-debug.log*
 yarn-debug.log*
 *.tsbuildinfo
 proposal.txt
+DESIGN.MD
+AGENDA.MD
+CHANGELOG.MD
