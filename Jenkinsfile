@@ -39,7 +39,7 @@ pipeline {
         stage('Validate') {
             steps {
                 script {
-                    runNode('npm run typecheck && npm test --workspaces --if-present')
+                    runNode('npm run build --workspace @rentorbit/shared && npm run typecheck && npm test --workspaces --if-present')
                 }
             }
         }
@@ -47,7 +47,7 @@ pipeline {
         stage('Build Workspaces') {
             steps {
                 script {
-                    runNode('npm run build --workspaces --if-present')
+                    runNode('npm run build --workspace @rentorbit/shared && npm run build --workspace @rentorbit/api && npm run build --workspace @rentorbit/web')
                 }
             }
         }
@@ -164,8 +164,8 @@ pipeline {
 }
 
 def runNode(String command) {
-    docker.image(env.NODE_BUILD_IMAGE).inside('-u root') {
-        sh command
+    docker.image(env.NODE_BUILD_IMAGE).inside("-e HOME=${env.WORKSPACE} -e npm_config_cache=${env.WORKSPACE}/.npm-cache") {
+        sh "mkdir -p .npm-cache && ${command}"
     }
 }
 
