@@ -303,6 +303,14 @@ function writeAiTagStates(states: Record<string, AiTagState>) {
   window.sessionStorage.setItem(aiTagStateKey, JSON.stringify(states));
 }
 
+function clearAiTagStates() {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.sessionStorage.removeItem(aiTagStateKey);
+}
+
 function mergeAiTagStates(
   tags: SearchIntelligenceTag[],
   previousStates: Record<string, AiTagState>
@@ -624,6 +632,10 @@ export function MarketplaceExperience() {
       filters.operationMode !== "all" ||
       !filters.includeCountrywide;
 
+    if (aiTagsCleared && !filters.query.trim()) {
+      return;
+    }
+
     if (!hasSpecificNeed) {
       return;
     }
@@ -647,7 +659,7 @@ export function MarketplaceExperience() {
     }, 550);
 
     return () => window.clearTimeout(timer);
-  }, [filters]);
+  }, [aiTagsCleared, filters]);
 
   const popularResults = useMemo(() => {
     const activeListings = seededListings
@@ -801,32 +813,28 @@ export function MarketplaceExperience() {
 
   function resetAiTags() {
     if (!intelligenceSession?.filterTags?.length) {
+      patchFilters({ query: "" });
+      clearAiTagStates();
+      setAiTagStates({});
+      setAiTagsCleared(true);
       return;
     }
 
-    const next = Object.fromEntries(
-      intelligenceSession.filterTags.map((tag) => [
-        tag.id,
-        {
-          id: tag.id,
-          label: tag.label,
-          color: aiTagStates[tag.id]?.color ?? tag.color,
-          textColor: aiTagStates[tag.id]?.textColor ?? tag.textColor,
-          active: false
-        }
-      ])
-    );
-    writeAiTagStates(next);
-    setAiTagStates(next);
+    const clearedTagIds = intelligenceSession.filterTags.map((tag) => tag.id);
+    const resetFilters = buildMarketplaceSearchFilters({ ...filters, query: "" }, false);
+
+    patchFilters({ query: "" });
+    clearAiTagStates();
+    setAiTagStates({});
     setAiTagsCleared(true);
     void recordSearchIntelligenceConversation({
       source: "marketplace",
-      query: filters.query.trim() || "marketplace discovery",
-      filters: buildMarketplaceSearchFilters(filters, false),
-      message: "AI filter tags reset and cleared.",
+      query: "",
+      filters: resetFilters,
+      message: "AI filter tags reset and search query cleared.",
       payload: {
         kind: "tag_reset",
-        disabledTagIds: Object.keys(next)
+        clearedTagIds
       }
     }).then((session) => {
       if (session) {

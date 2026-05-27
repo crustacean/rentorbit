@@ -41,6 +41,27 @@ type SearchMessageInput = {
   payload?: Record<string, unknown>;
 };
 
+function relevantSearchTokens(value: string): Set<string> {
+  return new Set(
+    value
+      .toLowerCase()
+      .split(/[^a-z0-9]+/g)
+      .filter((token) => token.length > 2)
+  );
+}
+
+function isRelevantSearchHistory(history: string, query: string): boolean {
+  const queryTokens = relevantSearchTokens(query);
+
+  if (queryTokens.size === 0) {
+    return false;
+  }
+
+  const historyTokens = relevantSearchTokens(history);
+
+  return [...queryTokens].some((token) => historyTokens.has(token));
+}
+
 @Injectable()
 export class IntelligenceService implements OnModuleInit {
   private readonly logger = new Logger(IntelligenceService.name);
@@ -211,16 +232,46 @@ export class IntelligenceService implements OnModuleInit {
       createdAt: now.toISOString(),
       payload: input.payload
     };
-    const nextQuery = input.query?.trim() || session.query;
+    const payloadKind = typeof input.payload?.kind === "string" ? input.payload.kind : undefined;
     const nextFilters = input.filters ?? session.filters;
+
+    if (payloadKind === "tag_reset") {
+      const assistantMessage: SearchIntelligenceMessage = {
+        role: "assistant",
+        content: "AI filter tags and the active search query were cleared. I will keep useful session context for the next search.",
+        createdAt: now.toISOString()
+      };
+      const nextSession: SearchIntelligenceSession = {
+        ...session,
+        lastActiveAt: now.toISOString(),
+        expiresAt: new Date(now.getTime() + this.sessionTtlMs()).toISOString(),
+        query: "",
+        filters: {
+          ...nextFilters,
+          query: undefined
+        },
+        messages: [...session.messages, userMessage, assistantMessage],
+        filterTags: [],
+        recommendations: []
+      };
+
+      store.intelligenceSessions.set(sessionId, nextSession);
+      this.scheduleSessionExpiry(sessionId);
+
+      return nextSession;
+    }
+
+    const nextQuery = input.query?.trim() || session.query;
     const needMessages = session.messages
       .filter((message) => message.role === "user")
       .filter((message) => {
         const kind = typeof message.payload?.kind === "string" ? message.payload.kind : "search_update";
         return kind === "search_update";
       })
+      .filter((message) => isRelevantSearchHistory(message.content, nextQuery))
+      .slice(-6)
       .map((message) => message.content);
-    const combinedNeed = [nextQuery, ...needMessages, input.payload?.kind === "search_update" ? input.message : ""]
+    const combinedNeed = [nextQuery, ...needMessages, payloadKind === "search_update" ? input.message : ""]
       .filter(Boolean)
       .join(" ");
     const refinedNeed = await this.openAiClient.refineSearchNeed({
