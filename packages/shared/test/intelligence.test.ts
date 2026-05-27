@@ -11,6 +11,8 @@ describe("listing intelligence", () => {
 
     expect(profile.listingId).toBe(listing!.id);
     expect(profile.normalizedNeedTags).toContain("tools");
+    expect(profile.normalizedNeedTags).not.toContain("for");
+    expect(profile.normalizedNeedTags).not.toContain("and");
     expect(profile.visualFactors.length).toBeGreaterThan(0);
     expect(profile.commercialSignals.ratingAverage).toBe(listing!.rating);
   });
@@ -23,6 +25,16 @@ describe("listing intelligence", () => {
     expect(recommendations[0]?.score).toBeGreaterThan(0);
     expect(recommendations[0]?.matchedTags.length).toBeGreaterThan(0);
     expect(buildSearchIntelligenceTags(recommendations).length).toBeGreaterThan(0);
+  });
+
+  it("ignores filler grammar and requires concrete venue signals for event space searches", () => {
+    const profiles = new Map(seededListings.map((listing) => [listing.id, buildLocalListingIntelligence(listing)]));
+    const recommendations = rankListingsForNeed("suggest a field which can hold events for 50 people", seededListings, profiles);
+    const recommendedIds = recommendations.map((recommendation) => recommendation.listingId);
+
+    expect(recommendedIds).not.toContain("lst_domestic_cleaning_nairobi_021");
+    expect(recommendations[0]?.listingId).toMatch(/lst_(events|spaces)_/);
+    expect(recommendations[0]?.matchedTags).not.toContain("For");
   });
 
   it("folds visits, comments, proposals, bookings, and ratings into commercial signals", () => {

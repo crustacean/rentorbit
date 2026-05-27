@@ -137,18 +137,143 @@ const markerDictionary = {
   tiles: ["tile", "tiles", "floor", "concrete", "carpet", "wood"]
 };
 
+const stopWords = new Set([
+  "about",
+  "above",
+  "after",
+  "again",
+  "against",
+  "also",
+  "among",
+  "around",
+  "because",
+  "before",
+  "being",
+  "between",
+  "could",
+  "does",
+  "doing",
+  "done",
+  "each",
+  "else",
+  "enter",
+  "from",
+  "give",
+  "have",
+  "help",
+  "here",
+  "into",
+  "just",
+  "keep",
+  "kind",
+  "like",
+  "list",
+  "make",
+  "many",
+  "more",
+  "near",
+  "need",
+  "onto",
+  "open",
+  "please",
+  "rent",
+  "same",
+  "show",
+  "some",
+  "such",
+  "than",
+  "that",
+  "their",
+  "them",
+  "then",
+  "there",
+  "these",
+  "they",
+  "this",
+  "those",
+  "want",
+  "what",
+  "when",
+  "where",
+  "which",
+  "while",
+  "with",
+  "would",
+  "your",
+  "able",
+  "can",
+  "for",
+  "and",
+  "the",
+  "all",
+  "any",
+  "are",
+  "our",
+  "you"
+]);
+
+const weakEvidenceTokens = new Set(["good", "item", "listing", "marketplace", "personnel", "resource", "service"]);
+const venueListingTokens = new Set(["canopy", "chair", "field", "garden", "ground", "hall", "land", "lawn", "outdoor", "parking", "room", "seat", "seating", "space", "studio", "table", "tent", "venue", "yard"]);
+const categoryAliases: Record<string, string[]> = {
+  domestic_help: ["cleaning", "cooking", "domestic", "home", "housekeeping"],
+  electronics: ["camera", "drone", "laptop", "projector", "screen"],
+  events: ["canopy", "chair", "event", "lighting", "party", "seat", "stage", "table", "tent"],
+  operators: ["driver", "engineer", "operator", "pilot", "technician"],
+  personnel: ["crew", "person", "staff", "team"],
+  professional_services: ["barber", "photographer", "professional", "shoot", "service"],
+  spaces: ["field", "hall", "land", "meeting", "room", "space", "studio", "venue", "yard"],
+  tools: ["generator", "machine", "tool"],
+  vehicles: ["bike", "bowser", "truck", "vehicle"]
+};
+
+const numberWords: Record<string, number> = {
+  one: 1,
+  two: 2,
+  three: 3,
+  four: 4,
+  five: 5,
+  six: 6,
+  seven: 7,
+  eight: 8,
+  nine: 9,
+  ten: 10,
+  eleven: 11,
+  twelve: 12,
+  twenty: 20,
+  thirty: 30,
+  forty: 40,
+  fifty: 50,
+  hundred: 100
+};
+
 function unique(values: string[]): string[] {
   return [...new Set(values.filter(Boolean))];
+}
+
+function normalizeToken(value: string): string {
+  const token = value.toLowerCase();
+  const aliased = token === "people" || token === "persons" ? "person" : token;
+
+  if (aliased.endsWith("ies") && aliased.length > 4) {
+    return `${aliased.slice(0, -3)}y`;
+  }
+
+  if (aliased.endsWith("s") && aliased.length > 3 && !aliased.endsWith("ss")) {
+    return aliased.slice(0, -1);
+  }
+
+  return aliased;
 }
 
 function tokenize(value: string): string[] {
   return unique(
     value
       .toLowerCase()
-      .replace(/[^a-z0-9\s-]/g, " ")
+      .replace(/[^a-z0-9]+/g, " ")
       .split(/\s+/)
       .map((token) => token.trim())
-      .filter((token) => token.length > 2)
+      .map(normalizeToken)
+      .filter((token) => (token.length > 2 || /^\d+$/.test(token)) && !stopWords.has(token))
   );
 }
 
@@ -218,12 +343,8 @@ function markerSummary(markers: string[], fallback: string): string[] {
   return markers.length > 0 ? unique(markers) : [fallback];
 }
 
-export function buildLocalListingIntelligence(
-  listing: ResourceListing,
-  lifecycleSignals: ListingLifecycleSignal[] = []
-): ListingIntelligenceProfile {
-  const now = new Date().toISOString();
-  const listingText = [
+function listingText(listing: ResourceListing): string {
+  return [
     listing.title,
     listing.description,
     listing.category,
@@ -236,17 +357,128 @@ export function buildLocalListingIntelligence(
   ]
     .filter(Boolean)
     .join(" ");
+}
 
-  const damageMarkers = matchingMarkers(listingText, markerDictionary.damage);
-  const repairMarkers = matchingMarkers(listingText, markerDictionary.repair);
-  const recentMarkers = matchingMarkers(listingText, markerDictionary.recent);
-  const oldMarkers = matchingMarkers(listingText, markerDictionary.old);
-  const cleanMarkers = matchingMarkers(listingText, markerDictionary.clean);
-  const dirtyMarkers = matchingMarkers(listingText, markerDictionary.dirty);
-  const spaceMarkers = matchingMarkers(listingText, markerDictionary.space);
-  const windowMarkers = matchingMarkers(listingText, markerDictionary.windows);
-  const lightingMarkers = matchingMarkers(listingText, markerDictionary.lighting);
-  const tileMarkers = matchingMarkers(listingText, markerDictionary.tiles);
+function extractCapacityNeed(value: string): number | undefined {
+  const lowered = value.toLowerCase();
+  const numericMatch = lowered.match(/\b(\d{1,5})\s*(people|persons|guests?|attendees?|pax|seats?)\b/);
+
+  if (numericMatch?.[1]) {
+    return Number(numericMatch[1]);
+  }
+
+  const tokens = tokenize(lowered);
+  const capacityIndex = tokens.findIndex((token) => ["attendee", "guest", "pax", "person", "seat"].includes(token));
+  const previous = capacityIndex > 0 ? tokens[capacityIndex - 1] : undefined;
+
+  return previous ? numberWords[previous] : undefined;
+}
+
+function inferSearchIntent(need: string) {
+  const tokens = tokenize(need);
+  const tokenSet = new Set(tokens);
+  const capacityNeed = extractCapacityNeed(need);
+  const preferredCategories = new Set<string>();
+  const venueCapacityIntent =
+    Boolean(capacityNeed) ||
+    ["field", "venue", "space", "yard", "land", "hall", "garden", "lawn", "ground", "hold", "host", "capacity"].some((token) =>
+      tokenSet.has(token)
+    );
+
+  for (const [category, aliases] of Object.entries(categoryAliases)) {
+    if (aliases.some((alias) => tokenSet.has(alias))) {
+      preferredCategories.add(category);
+    }
+  }
+
+  if (venueCapacityIntent) {
+    preferredCategories.add("spaces");
+    preferredCategories.add("events");
+  }
+
+  return {
+    tokens,
+    tokenSet,
+    preferredCategories,
+    venueCapacityIntent,
+    capacityNeed
+  };
+}
+
+function listingSemanticSignals(listing: ResourceListing, profile?: ListingIntelligenceProfile): Set<string> {
+  const signals = new Set([
+    ...tokenize(listingText(listing)),
+    ...tokenize(listing.kind),
+    ...tokenize(listing.category),
+    ...tokenize(listing.subCategory ?? ""),
+    ...(profile?.normalizedNeedTags.flatMap(tokenize) ?? [])
+  ]);
+
+  if (listing.category === "spaces") {
+    ["capacity", "hold", "host", "location", "site", "venue"].forEach((signal) => signals.add(signal));
+    const coreSignals = new Set(tokenize(`${listing.title} ${listing.description} ${listing.subCategory ?? ""}`));
+
+    if (["field", "garden", "ground", "land", "lawn", "outdoor", "yard"].some((signal) => coreSignals.has(signal))) {
+      ["field", "outdoor"].forEach((signal) => signals.add(signal));
+    }
+  }
+
+  if (listing.category === "events" && ["canopy", "chair", "seating", "table", "tent"].some((signal) => signals.has(signal))) {
+    ["capacity", "guest", "hold", "host", "person", "seat", "venue"].forEach((signal) => signals.add(signal));
+  }
+
+  return signals;
+}
+
+function hasVenueListingSignal(listing: ResourceListing): boolean {
+  if (listing.category === "spaces") {
+    return true;
+  }
+
+  const coreSignals = new Set(tokenize(`${listing.title} ${listing.description} ${listing.subCategory ?? ""}`));
+  return listing.category === "events" && [...venueListingTokens].some((token) => coreSignals.has(token));
+}
+
+function estimateListingCapacity(listing: ResourceListing): number | undefined {
+  const metadataValues = Object.entries(listing.metadata)
+    .filter(([key, value]) => /capacity|guest|attendee|seat|chair|quantity|items/i.test(key) && typeof value === "number")
+    .map(([, value]) => value as number);
+
+  if (metadataValues.length > 0) {
+    return Math.max(...metadataValues);
+  }
+
+  const text = listingText(listing).toLowerCase();
+  const numericMatch = text.match(/\b(\d{1,5})\s*(people|persons|guests?|attendees?|pax|seats?|chairs?)\b/);
+
+  if (numericMatch?.[1]) {
+    return Number(numericMatch[1]);
+  }
+
+  const wordMatch = text.match(
+    /\b(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|twenty|thirty|forty|fifty)\s*[- ]?(people|persons|guests?|attendees?|pax|seats?|chairs?)\b/
+  );
+
+  return wordMatch?.[1] ? numberWords[wordMatch[1]] : undefined;
+}
+
+export function buildLocalListingIntelligence(
+  listing: ResourceListing,
+  lifecycleSignals: ListingLifecycleSignal[] = []
+): ListingIntelligenceProfile {
+  const now = new Date().toISOString();
+  const text = listingText(listing);
+
+  const damageMarkers = matchingMarkers(text, markerDictionary.damage);
+  const repairMarkers = matchingMarkers(text, markerDictionary.repair);
+  const recentMarkers = matchingMarkers(text, markerDictionary.recent);
+  const oldMarkers = matchingMarkers(text, markerDictionary.old);
+  const cleanMarkers = matchingMarkers(text, markerDictionary.clean);
+  const dirtyMarkers = matchingMarkers(text, markerDictionary.dirty);
+  const spaceMarkers = matchingMarkers(text, markerDictionary.space);
+  const windowMarkers = matchingMarkers(text, markerDictionary.windows);
+  const lightingMarkers = matchingMarkers(text, markerDictionary.lighting);
+  const tileMarkers = matchingMarkers(text, markerDictionary.tiles);
 
   const prices = lifecycleSignals
     .filter((signal) => signal.type === "price_agreed" && typeof signal.value === "number")
@@ -310,7 +542,7 @@ export function buildLocalListingIntelligence(
       cleanlinessMarkers: markerSummary([...cleanMarkers, ...dirtyMarkers], "cleanliness not inferred")
     },
     spaceQuality: {
-      wallCondition: markerSummary(matchingMarkers(listingText, ["wall", "walls", "clean walls", "dirty walls"]), "not inferred"),
+      wallCondition: markerSummary(matchingMarkers(text, ["wall", "walls", "clean walls", "dirty walls"]), "not inferred"),
       windows: markerSummary(windowMarkers, "not inferred"),
       lighting: markerSummary(lightingMarkers, "not inferred"),
       floorAndTileCondition: markerSummary(tileMarkers, "not inferred")
@@ -337,40 +569,81 @@ export function scoreListingForNeed(
   listing: ResourceListing,
   profile?: ListingIntelligenceProfile
 ): SearchIntelligenceRecommendation {
-  const needTokens = tokenize(need);
+  const intent = inferSearchIntent(need);
+  const needTokens = intent.tokens;
   const profileTags = profile?.normalizedNeedTags ?? [];
   const listingTokenTags = tokenize(`${listing.title} ${listing.description} ${listing.category} ${listing.subCategory ?? ""}`);
   const tagSet = new Set([...profileTags.map((tag) => tag.toLowerCase()), ...listingTokenTags]);
-  const matchedTokens = needTokens.filter((token) => tagSet.has(token) || [...tagSet].some((tag) => tag.includes(token)));
+  const listingSignals = listingSemanticSignals(listing, profile);
+  const matchedTokens = needTokens.filter(
+    (token) => !weakEvidenceTokens.has(token) && (tagSet.has(token) || [...tagSet].some((tag) => tag.includes(token)))
+  );
+  const matchedSemanticTokens = needTokens.filter(
+    (token) => !weakEvidenceTokens.has(token) && !matchedTokens.includes(token) && listingSignals.has(token)
+  );
+  const matchedEvidenceTokens = unique([...matchedTokens, ...matchedSemanticTokens]);
   const listingTags = listingSearchTags(listing, profile);
   const matchedTagLabels = listingTags.filter((tag) => {
     const lowered = tag.toLowerCase();
-    return needTokens.some((token) => lowered.includes(token)) || matchedTokens.some((token) => lowered.includes(token));
+    return matchedEvidenceTokens.some((token) => lowered.includes(token));
   });
   const fallbackTags = listingTags.filter((tag) =>
     [
-      listing.kind,
       listing.category,
       listing.location.county,
       listing.location.town,
-      priceTag(listing).toLowerCase(),
-      listing.rating >= 4.8 ? "top rated" : ""
+      priceTag(listing).toLowerCase()
     ].some((marker) => marker && tag.toLowerCase().includes(marker.toLowerCase()))
   );
-  const categoryBonus = needTokens.includes(listing.category.toLowerCase()) ? 18 : 0;
-  const locationBonus = needTokens.includes(listing.location.county.toLowerCase()) || needTokens.includes(listing.location.town.toLowerCase()) ? 10 : 0;
+  const categoryTokens = tokenize(`${listing.category} ${listing.subCategory ?? ""}`);
+  const categoryBonus =
+    categoryTokens.some((token) => intent.tokenSet.has(token)) || intent.preferredCategories.has(listing.category)
+      ? intent.venueCapacityIntent
+        ? 22
+        : 18
+      : 0;
+  const locationBonus = tokenize(`${listing.location.county} ${listing.location.town}`).some((token) => intent.tokenSet.has(token)) ? 10 : 0;
+  const capacity = estimateListingCapacity(listing);
+  const hasCapacitySignal = ["capacity", "guest", "hold", "host", "person", "seat"].some((token) => listingSignals.has(token));
+  const fieldLikeNeed = ["field", "garden", "ground", "land", "lawn", "yard"].some((token) => intent.tokenSet.has(token));
+  const coreSignals = new Set(tokenize(`${listing.title} ${listing.description} ${listing.subCategory ?? ""}`));
+  const outdoorSpaceBonus =
+    fieldLikeNeed && listing.category === "spaces"
+      ? ["field", "garden", "ground", "land", "lawn", "outdoor", "yard"].some((token) => coreSignals.has(token))
+        ? 18
+        : 0
+      : 0;
+  const capacityBonus = intent.capacityNeed
+    ? capacity && capacity >= intent.capacityNeed
+      ? 18
+      : hasCapacitySignal || hasVenueListingSignal(listing)
+        ? 8
+        : 0
+    : 0;
+  const venueGateFailed = intent.venueCapacityIntent && !hasVenueListingSignal(listing);
   const conditionPenalty = (profile?.condition.damageMarkers.length ?? 0) * 4;
-  const demandBonus = Math.min(16, (profile?.commercialSignals.demandScore ?? listing.rating * 10) / 7);
-  const score = Number(Math.max(0, Math.min(100, matchedTokens.length * 12 + categoryBonus + locationBonus + demandBonus - conditionPenalty)).toFixed(1));
+  const evidenceScore =
+    matchedTokens.length * 14 +
+    matchedSemanticTokens.length * 10 +
+    categoryBonus +
+    locationBonus +
+    outdoorSpaceBonus +
+    capacityBonus;
+  const demandBonus = evidenceScore > 0 ? Math.min(8, (profile?.commercialSignals.demandScore ?? listing.rating * 10) / 14) : 0;
+  const score = venueGateFailed
+    ? 0
+    : Number(Math.max(0, Math.min(100, evidenceScore + demandBonus - conditionPenalty)).toFixed(1));
 
   return {
     listingId: listing.id,
     score,
     reasons: unique([
-      ...matchedTokens.slice(0, 4).map((token) => `matches "${token}"`),
+      ...matchedEvidenceTokens.slice(0, 4).map((token) => `matches "${token}"`),
       categoryBonus > 0 ? `category ${listing.category}` : "",
+      outdoorSpaceBonus > 0 ? "outdoor or field-ready space" : "",
+      capacityBonus > 0 ? (capacity ? `capacity signal ${capacity}` : "capacity-ready listing") : "",
       locationBonus > 0 ? `near ${listing.location.town}` : "",
-      demandBonus > 8 ? "strong marketplace signal" : "",
+      demandBonus > 5 ? "strong marketplace signal" : "",
       conditionPenalty > 0 ? "has condition risk markers" : ""
     ]),
     matchedTags: unique([...matchedTagLabels, ...fallbackTags]).slice(0, 12),
