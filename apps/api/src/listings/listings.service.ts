@@ -7,6 +7,7 @@ import {
   type SearchFilters
 } from "@rentorbit/shared";
 import { store } from "../common/in-memory-store.js";
+import { IntelligenceService } from "../intelligence/intelligence.service.js";
 
 type SearchQuery = Record<string, string | undefined>;
 
@@ -23,6 +24,8 @@ function parseNumber(value: string | undefined): number | undefined {
 
 @Injectable()
 export class ListingsService {
+  constructor(private readonly intelligenceService: IntelligenceService) {}
+
   search(query: SearchQuery) {
     const filters: SearchFilters = {
       query: query.q,
@@ -71,6 +74,7 @@ export class ListingsService {
       updatedAt: now
     };
     store.listings.set(listing.id, listing);
+    this.intelligenceService.queueListingAnalysis(listing, userId);
     return listing;
   }
 }

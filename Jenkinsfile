@@ -198,33 +198,38 @@ def deployToKubernetes() {
     env.WEB_IMAGE = "${env.WEB_IMAGE_NAME}:${env.IMAGE_TAG}"
     env.API_IMAGE = "${env.API_IMAGE_NAME}:${env.IMAGE_TAG}"
 
-    withKubeConfig(
-        clusterName: env.KUBE_CLUSTER,
-        contextName: env.KUBE_CONTEXT,
-        credentialsId: env.KUBE_CREDENTIALS,
-        namespace: env.KUBE_NAMESPACE,
-        restrictKubeConfigAccess: false,
-        serverUrl: env.KUBE_SERVER_URL
-    ) {
-        sh '''
-            set -eu
-            rm -rf prepared-k8s
-            mkdir -p prepared-k8s
+    withCredentials([string(credentialsId: env.OPENAI_API_KEY_CREDENTIALS, variable: 'OPENAI_API_KEY')]) {
+        withKubeConfig(
+            clusterName: env.KUBE_CLUSTER,
+            contextName: env.KUBE_CONTEXT,
+            credentialsId: env.KUBE_CREDENTIALS,
+            namespace: env.KUBE_NAMESPACE,
+            restrictKubeConfigAccess: false,
+            serverUrl: env.KUBE_SERVER_URL
+        ) {
+            sh '''
+                set -eu
+                rm -rf prepared-k8s
+                mkdir -p prepared-k8s
 
-            for manifest in namespace configmap services web-deployment api-deployment web-ingress api-ingress; do
-                envsubst < "k8s/${manifest}.yaml" > "prepared-k8s/${manifest}.yaml"
-            done
+                for manifest in namespace configmap services web-deployment api-deployment web-ingress api-ingress; do
+                    envsubst < "k8s/${manifest}.yaml" > "prepared-k8s/${manifest}.yaml"
+                done
 
-            kubectl apply -f prepared-k8s/namespace.yaml
-            kubectl apply -f prepared-k8s/configmap.yaml
-            kubectl apply -f prepared-k8s/services.yaml
-            kubectl apply -f prepared-k8s/web-deployment.yaml
-            kubectl apply -f prepared-k8s/api-deployment.yaml
-            kubectl apply -f prepared-k8s/web-ingress.yaml
-            kubectl apply -f prepared-k8s/api-ingress.yaml
+                kubectl apply -f prepared-k8s/namespace.yaml
+                kubectl apply -f prepared-k8s/configmap.yaml
+                kubectl -n "${KUBE_NAMESPACE}" create secret generic rentorbit-openai \
+                    --from-literal=OPENAI_API_KEY="${OPENAI_API_KEY}" \
+                    --dry-run=client -o yaml | kubectl apply -f -
+                kubectl apply -f prepared-k8s/services.yaml
+                kubectl apply -f prepared-k8s/web-deployment.yaml
+                kubectl apply -f prepared-k8s/api-deployment.yaml
+                kubectl apply -f prepared-k8s/web-ingress.yaml
+                kubectl apply -f prepared-k8s/api-ingress.yaml
 
-            kubectl -n "${KUBE_NAMESPACE}" rollout status deployment/rentorbit-api
-            kubectl -n "${KUBE_NAMESPACE}" rollout status deployment/rentorbit-web
-        '''
+                kubectl -n "${KUBE_NAMESPACE}" rollout status deployment/rentorbit-api
+                kubectl -n "${KUBE_NAMESPACE}" rollout status deployment/rentorbit-web
+            '''
+        }
     }
 }

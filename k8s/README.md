@@ -15,6 +15,7 @@ Required Jenkins deploy variables:
 - `API_INTERNAL_URL`
 - `INGRESS_CLASS`
 - `INGRESS_HOST`
+- `OPENAI_API_KEY_CREDENTIALS` Jenkins string credential ID used to populate the `OPENAI_API_KEY` secret for listing and search intelligence.
 
 Required RBAC bootstrap variables:
 
@@ -32,3 +33,4 @@ envsubst < k8s/rbac.yaml | kubectl apply -f -
 ```
 
 `secret.example.yaml` is a template only. Do not apply it with real values committed to Git.
+Jenkins creates/updates the `rentorbit-openai` secret from `OPENAI_API_KEY_CREDENTIALS` during deploy.

@@ -3,6 +3,7 @@ import { ConfigModule } from "@nestjs/config";
 import { AuthModule } from "./auth/auth.module.js";
 import { ChatModule } from "./chat/chat.module.js";
 import { ContractsModule } from "./contracts/contracts.module.js";
+import { IntelligenceModule } from "./intelligence/intelligence.module.js";
 import { KycModule } from "./kyc/kyc.module.js";
 import { ListingsModule } from "./listings/listings.module.js";
 import { NotificationsModule } from "./notifications/notifications.module.js";
@@ -14,6 +15,7 @@ import { RealtimeModule } from "./realtime/realtime.module.js";
     ConfigModule.forRoot({ isGlobal: true }),
     AuthModule,
     ListingsModule,
+    IntelligenceModule,
     ChatModule,
     ContractsModule,
     PaymentsModule,

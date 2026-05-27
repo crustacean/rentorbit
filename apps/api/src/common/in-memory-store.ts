@@ -1,4 +1,11 @@
-import { seededListings, type ContractSummary, type KycStatus, type ResourceListing } from "@rentorbit/shared";
+import {
+  seededListings,
+  type ContractSummary,
+  type KycStatus,
+  type ListingIntelligenceProfile,
+  type ResourceListing,
+  type SearchIntelligenceSession
+} from "@rentorbit/shared";
 
 export type UserRecord = {
   id: string;
@@ -73,6 +80,8 @@ export class InMemoryStore {
   readonly messages = new Map<string, ChatMessageRecord>();
   readonly contracts = new Map<string, ContractSummary>();
   readonly ledger = new Map<string, PaymentLedgerEntry>();
+  readonly listingIntelligence = new Map<string, ListingIntelligenceProfile>();
+  readonly intelligenceSessions = new Map<string, SearchIntelligenceSession>();
 
   nextId(prefix: string): string {
     return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;

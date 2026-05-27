@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
+import { startSearchIntelligenceSession } from "@/lib/intelligence";
 import { seededListings, type ResourceListing } from "@rentorbit/shared";
 
 const featuredListings = [...seededListings]
@@ -37,6 +38,9 @@ export function HomeLanding() {
     event.preventDefault();
 
     const trimmed = searchTerm.trim();
+    if (trimmed) {
+      void startSearchIntelligenceSession({ query: trimmed, source: "home" });
+    }
     router.push(trimmed ? `/marketplace?search=${encodeURIComponent(trimmed)}` : "/marketplace");
   }
 

@@ -9,7 +9,8 @@
     "start:dev": "tsx watch src/main.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate dev"
+    "prisma:migrate": "prisma migrate dev",
+    "intelligence:seed": "tsx src/intelligence/seed-profiles.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.1.23",

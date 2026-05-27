@@ -40,6 +40,27 @@ spec:
                 configMapKeyRef:
                   name: rentorbit-config
                   key: APP_URL
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: rentorbit-openai
+                  key: OPENAI_API_KEY
+                  optional: true
+            - name: OPENAI_INTELLIGENCE_MODEL
+              valueFrom:
+                configMapKeyRef:
+                  name: rentorbit-config
+                  key: OPENAI_INTELLIGENCE_MODEL
+            - name: INTELLIGENCE_SESSION_TTL_MS
+              valueFrom:
+                configMapKeyRef:
+                  name: rentorbit-config
+                  key: INTELLIGENCE_SESSION_TTL_MS
+            - name: INTELLIGENCE_PROFILE_DIR
+              valueFrom:
+                configMapKeyRef:
+                  name: rentorbit-config
+                  key: INTELLIGENCE_PROFILE_DIR
           readinessProbe:
             tcpSocket:
               port: http

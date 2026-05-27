@@ -24,6 +24,7 @@ import { CustomSelect, type CustomSelectOption } from "@/components/CustomSelect
 import { SiteHeader } from "@/components/SiteHeader";
 import { AuthModal, type AccountMode } from "@/components/AuthModal";
 import { readAccountSession } from "@/lib/accountSession";
+import { readSearchIntelligenceSession, recordListingIntelligenceSignal, startSearchIntelligenceSession } from "@/lib/intelligence";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import {
@@ -39,6 +40,8 @@ import {
   type Coordinates,
   type OperationMode,
   type ResourceListing,
+  type SearchFilters,
+  type SearchIntelligenceSession,
   type SearchResult
 } from "@rentorbit/shared";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -237,6 +240,36 @@ function listingInventoryTotal(listing: ResourceListing): number {
   return seededInventoryTotals[listing.id] ?? 1;
 }
 
+function buildMarketplaceSearchFilters(filters: FilterState, includeQuery: boolean): SearchFilters {
+  const origin = filters.county !== "all" ? countyOrigins[filters.county] : undefined;
+
+  return {
+    query: includeQuery ? filters.query : undefined,
+    category: filters.category === "all" ? undefined : filters.category,
+    county: filters.county === "all" ? undefined : filters.county,
+    radiusKm: origin ? filters.radiusKm : undefined,
+    origin,
+    operationMode: filters.operationMode === "all" ? undefined : (filters.operationMode as OperationMode),
+    includeCountrywide: filters.includeCountrywide,
+    start: filters.start,
+    end: filters.end
+  };
+}
+
+function orderResultsByIntelligence(
+  candidateResults: SearchResult[],
+  intelligenceSession: SearchIntelligenceSession | null
+): SearchResult[] {
+  if (!intelligenceSession?.recommendations.length) {
+    return [];
+  }
+
+  const resultsById = new Map(candidateResults.map((result) => [result.listing.id, result]));
+  return intelligenceSession.recommendations
+    .map((recommendation) => resultsById.get(recommendation.listingId))
+    .filter((result): result is SearchResult => Boolean(result));
+}
+
 function readMarketplaceThreads(): AccountChatThread[] {
   if (typeof window === "undefined") {
     return [];
@@ -378,22 +411,31 @@ export function MarketplaceExperience() {
   const [savedListingIds, setSavedListingIds] = useState<string[]>([]);
   const [bookingQuantity, setBookingQuantity] = useState("1");
   const [bookedUnitCounts] = useState<Record<string, number>>(seededBookedUnits);
+  const [intelligenceSession, setIntelligenceSession] = useState<SearchIntelligenceSession | null>(null);
 
   useEffect(registerServiceWorker, []);
 
   useEffect(() => {
-    const requestedListingId = new URLSearchParams(window.location.search).get("listing");
+    setIntelligenceSession(readSearchIntelligenceSession());
+
+    const params = new URLSearchParams(window.location.search);
+    const requestedListingId = params.get("listing");
+    const requestedSearch = params.get("search")?.trim() ?? "";
     const requestedListing = requestedListingId
       ? seededListings.find((listing) => listing.id === requestedListingId)
       : undefined;
 
     if (!requestedListing) {
+      if (requestedSearch) {
+        setFilters((current) => normalizeFilterWindow(current, { query: requestedSearch }));
+      }
       return;
     }
 
     requestedListingRef.current = requestedListing.id;
     setFilters({
       ...initialFilters,
+      query: requestedSearch,
       category: "all",
       county: "all",
       operationMode: "all",
@@ -459,20 +501,47 @@ export function MarketplaceExperience() {
     };
   }, [focusedListingId]);
 
+  const exactResults = useMemo(() => filterListings(seededListings, buildMarketplaceSearchFilters(filters, true)), [filters]);
+  const intelligenceCandidateResults = useMemo(() => filterListings(seededListings, buildMarketplaceSearchFilters(filters, false)), [filters]);
+  const intelligenceResults = useMemo(
+    () => orderResultsByIntelligence(intelligenceCandidateResults, intelligenceSession),
+    [intelligenceCandidateResults, intelligenceSession]
+  );
   const results = useMemo(() => {
-    const origin = filters.county !== "all" ? countyOrigins[filters.county] : undefined;
-    return filterListings(seededListings, {
-      query: filters.query,
-      category: filters.category === "all" ? undefined : filters.category,
-      county: filters.county === "all" ? undefined : filters.county,
-      radiusKm: origin ? filters.radiusKm : undefined,
-      origin,
-      operationMode: filters.operationMode === "all" ? undefined : (filters.operationMode as OperationMode),
-      includeCountrywide: filters.includeCountrywide,
-      start: filters.start,
-      end: filters.end
-    });
+    if (filters.query.trim() && intelligenceResults.length > 0) {
+      return intelligenceResults;
+    }
+
+    return exactResults;
+  }, [exactResults, filters.query, intelligenceResults]);
+
+  useEffect(() => {
+    const hasSpecificNeed =
+      filters.query.trim().length > 0 ||
+      filters.category !== "all" ||
+      filters.county !== "all" ||
+      filters.operationMode !== "all" ||
+      !filters.includeCountrywide;
+
+    if (!hasSpecificNeed) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      void startSearchIntelligenceSession({
+        query: filters.query.trim() || "marketplace discovery",
+        source: "marketplace",
+        filters: buildMarketplaceSearchFilters(filters, false)
+      }).then((session) => {
+        if (session) {
+          setIntelligenceSession(session);
+        }
+      });
+    }, 550);
+
+    return () => window.clearTimeout(timer);
   }, [filters]);
+
   const popularResults = useMemo(() => {
     const activeListings = seededListings
       .filter((listing) => listing.status === "active" && listing.media.length > 0)
@@ -617,6 +686,7 @@ export function MarketplaceExperience() {
 
   function openFocusedListing(listing: ResourceListing) {
     selectListing(listing);
+    void recordListingIntelligenceSignal(listing.id, { type: "visit_recorded" });
     setFocusedListingId(listing.id);
     setFocusedImageIndex(0);
     setFocusedZoom(1);
@@ -628,6 +698,7 @@ export function MarketplaceExperience() {
 
   function openFocusedDmListing(listing: ResourceListing) {
     selectListing(listing);
+    void recordListingIntelligenceSignal(listing.id, { type: "visit_recorded", note: "DM opened" });
     setFocusedListingId(listing.id);
     setFocusedImageIndex(0);
     setFocusedZoom(1);
@@ -682,12 +753,14 @@ export function MarketplaceExperience() {
       text,
       time: "Now"
     });
+    void recordListingIntelligenceSignal(focusedListing.id, { type: "message_sent", note: text });
     setFocusedThread(thread);
     setFocusedDraft("");
   }
 
   function saveListingToAccount(listing: ResourceListing) {
     const nextListings = saveMarketplaceListing(listing);
+    void recordListingIntelligenceSignal(listing.id, { type: "saved" });
     setSavedListingIds(nextListings.map((savedListing) => savedListing.id));
   }
 
@@ -719,6 +792,11 @@ export function MarketplaceExperience() {
       createdAt: new Date().toISOString()
     });
     setContract(nextContract);
+    void recordListingIntelligenceSignal(selectedListing.id, {
+      type: "proposal_created",
+      value: proposalQuantity,
+      note: `${readableMode(activeMode)} proposal for ${proposalQuantity} item(s)`
+    });
     setChatLines((current) => [
       ...current,
       {
