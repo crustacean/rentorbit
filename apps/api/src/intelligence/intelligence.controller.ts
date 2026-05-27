@@ -11,6 +11,7 @@ type SearchMessageBody = {
   message?: string;
   query?: string;
   filters?: SearchFilters;
+  payload?: Record<string, unknown>;
 };
 
 type ListingSignalBody = Partial<ListingLifecycleSignal>;
@@ -107,7 +108,8 @@ export class IntelligenceController {
     return this.intelligenceService.continueSearchSession(sessionId, {
       message: body.message?.trim() || "Help me find a better match.",
       query: body.query,
-      filters: body.filters
+      filters: body.filters,
+      payload: body.payload
     });
   }
 }

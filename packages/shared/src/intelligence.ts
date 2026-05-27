@@ -77,13 +77,23 @@ export type SearchIntelligenceMessage = {
   role: "user" | "assistant" | "system";
   content: string;
   createdAt: string;
+  payload?: Record<string, unknown>;
 };
 
 export type SearchIntelligenceRecommendation = {
   listingId: string;
   score: number;
   reasons: string[];
+  matchedTags: string[];
   profileSummary: string;
+};
+
+export type SearchIntelligenceTag = {
+  id: string;
+  label: string;
+  color: string;
+  textColor: string;
+  matchCount: number;
 };
 
 export type SearchIntelligenceSession = {
@@ -95,8 +105,24 @@ export type SearchIntelligenceSession = {
   query: string;
   filters: SearchFilters;
   messages: SearchIntelligenceMessage[];
+  filterTags: SearchIntelligenceTag[];
   recommendations: SearchIntelligenceRecommendation[];
 };
+
+const tagPalette = [
+  { color: "#DBEAFE", textColor: "#1D4ED8" },
+  { color: "#D1FAE5", textColor: "#047857" },
+  { color: "#FEF3C7", textColor: "#92400E" },
+  { color: "#F3E8FF", textColor: "#7E22CE" },
+  { color: "#FCE7F3", textColor: "#BE185D" },
+  { color: "#E0E7FF", textColor: "#4338CA" },
+  { color: "#CFFAFE", textColor: "#0F766E" },
+  { color: "#FFEDD5", textColor: "#C2410C" },
+  { color: "#DCFCE7", textColor: "#166534" },
+  { color: "#FFE4E6", textColor: "#BE123C" },
+  { color: "#EDE9FE", textColor: "#6D28D9" },
+  { color: "#CCFBF1", textColor: "#0F766E" }
+] as const;
 
 const markerDictionary = {
   damage: ["broken", "bent", "cracked", "damaged", "destroyed", "torn", "rust", "scratched", "faulty"],
@@ -124,6 +150,63 @@ function tokenize(value: string): string[] {
       .map((token) => token.trim())
       .filter((token) => token.length > 2)
   );
+}
+
+function tagId(label: string): string {
+  return label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+}
+
+function titleCase(value: string): string {
+  return value
+    .split(/[\s_-]+/)
+    .filter(Boolean)
+    .map((part) => `${part[0]?.toUpperCase() ?? ""}${part.slice(1).toLowerCase()}`)
+    .join(" ");
+}
+
+function priceTag(listing: ResourceListing): string {
+  const amount = listing.modeRules[0]?.pricing.rate.amount ?? 0;
+  if (amount <= 2500) return "Budget price";
+  if (amount <= 8500) return "Mid price";
+  return "Premium price";
+}
+
+function listingSearchTags(listing: ResourceListing, profile?: ListingIntelligenceProfile): string[] {
+  const ratingTag = listing.rating >= 4.8 ? "Top rated" : listing.rating >= 4.5 ? "High rating" : "Rated";
+  const modeTags = listing.modeRules.map((rule) => titleCase(rule.mode));
+  const deliveryTags = listing.logistics.deliveryModes.map((mode) =>
+    mode === "countrywide_delivery" ? "Countrywide delivery" : titleCase(mode)
+  );
+  const conditionTags = [
+    ...(profile?.condition.estimatedAgeBand && profile.condition.estimatedAgeBand !== "unknown"
+      ? [titleCase(profile.condition.estimatedAgeBand)]
+      : []),
+    ...(profile?.condition.damageMarkers.length ? ["Damage marker"] : []),
+    ...(profile?.condition.repairMarkers.length ? ["Repair marker"] : []),
+    ...(profile?.condition.cleanlinessMarkers.filter((marker) => marker !== "cleanliness not inferred").map(titleCase) ?? [])
+  ];
+  const visualTags = profile?.visualFactors.flatMap((factor) => [
+    ...factor.ageMarkers.filter((marker) => marker !== "unknown model age").map(titleCase),
+    ...factor.spaceMarkers.filter((marker) => marker !== "not space-specific").map(titleCase),
+    ...factor.lightingMarkers.filter((marker) => marker !== "lighting not inferred").map(titleCase),
+    ...factor.riskMarkers.filter((marker) => marker !== "no obvious risk marker recorded").map(titleCase)
+  ]) ?? [];
+
+  return unique([
+    titleCase(listing.kind),
+    titleCase(listing.category),
+    listing.subCategory ? titleCase(listing.subCategory) : "",
+    listing.location.county,
+    listing.location.town,
+    ratingTag,
+    priceTag(listing),
+    listing.location.countrywideAvailable ? "Countrywide" : "",
+    ...deliveryTags,
+    ...modeTags,
+    ...conditionTags,
+    ...visualTags,
+    ...(profile?.normalizedNeedTags.map(titleCase) ?? [])
+  ]).slice(0, 32);
 }
 
 function matchingMarkers(text: string, markers: string[]): string[] {
@@ -256,9 +339,24 @@ export function scoreListingForNeed(
 ): SearchIntelligenceRecommendation {
   const needTokens = tokenize(need);
   const profileTags = profile?.normalizedNeedTags ?? [];
-  const listingTags = tokenize(`${listing.title} ${listing.description} ${listing.category} ${listing.subCategory ?? ""}`);
-  const tagSet = new Set([...profileTags.map((tag) => tag.toLowerCase()), ...listingTags]);
+  const listingTokenTags = tokenize(`${listing.title} ${listing.description} ${listing.category} ${listing.subCategory ?? ""}`);
+  const tagSet = new Set([...profileTags.map((tag) => tag.toLowerCase()), ...listingTokenTags]);
   const matchedTokens = needTokens.filter((token) => tagSet.has(token) || [...tagSet].some((tag) => tag.includes(token)));
+  const listingTags = listingSearchTags(listing, profile);
+  const matchedTagLabels = listingTags.filter((tag) => {
+    const lowered = tag.toLowerCase();
+    return needTokens.some((token) => lowered.includes(token)) || matchedTokens.some((token) => lowered.includes(token));
+  });
+  const fallbackTags = listingTags.filter((tag) =>
+    [
+      listing.kind,
+      listing.category,
+      listing.location.county,
+      listing.location.town,
+      priceTag(listing).toLowerCase(),
+      listing.rating >= 4.8 ? "top rated" : ""
+    ].some((marker) => marker && tag.toLowerCase().includes(marker.toLowerCase()))
+  );
   const categoryBonus = needTokens.includes(listing.category.toLowerCase()) ? 18 : 0;
   const locationBonus = needTokens.includes(listing.location.county.toLowerCase()) || needTokens.includes(listing.location.town.toLowerCase()) ? 10 : 0;
   const conditionPenalty = (profile?.condition.damageMarkers.length ?? 0) * 4;
@@ -275,8 +373,42 @@ export function scoreListingForNeed(
       demandBonus > 8 ? "strong marketplace signal" : "",
       conditionPenalty > 0 ? "has condition risk markers" : ""
     ]),
+    matchedTags: unique([...matchedTagLabels, ...fallbackTags]).slice(0, 12),
     profileSummary: profile?.summary ?? `${listing.title}: ${listing.description}`
   };
+}
+
+export function buildSearchIntelligenceTags(
+  recommendations: SearchIntelligenceRecommendation[],
+  limit = 20
+): SearchIntelligenceTag[] {
+  const counts = new Map<string, { label: string; count: number }>();
+
+  for (const recommendation of recommendations) {
+    for (const label of recommendation.matchedTags) {
+      const id = tagId(label);
+      const current = counts.get(id);
+      counts.set(id, {
+        label,
+        count: (current?.count ?? 0) + 1
+      });
+    }
+  }
+
+  return [...counts.entries()]
+    .sort((left, right) => right[1].count - left[1].count || left[1].label.localeCompare(right[1].label))
+    .slice(0, limit)
+    .map(([id, item], index) => {
+      const palette = tagPalette[index % tagPalette.length] ?? tagPalette[0];
+
+      return {
+        id,
+        label: item.label,
+        matchCount: item.count,
+        color: palette.color,
+        textColor: palette.textColor
+      };
+    });
 }
 
 export function rankListingsForNeed(

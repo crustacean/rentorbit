@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildLocalListingIntelligence, rankListingsForNeed } from "../src/intelligence.js";
+import { buildLocalListingIntelligence, buildSearchIntelligenceTags, rankListingsForNeed } from "../src/intelligence.js";
 import { seededListings } from "../src/sample-data.js";
 
 describe("listing intelligence", () => {
@@ -21,6 +21,8 @@ describe("listing intelligence", () => {
 
     expect(recommendations[0]?.listingId).toBe("lst_tools_generator_kisumu_002");
     expect(recommendations[0]?.score).toBeGreaterThan(0);
+    expect(recommendations[0]?.matchedTags.length).toBeGreaterThan(0);
+    expect(buildSearchIntelligenceTags(recommendations).length).toBeGreaterThan(0);
   });
 
   it("folds visits, comments, proposals, bookings, and ratings into commercial signals", () => {

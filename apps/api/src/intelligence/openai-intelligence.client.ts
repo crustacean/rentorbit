@@ -1,6 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import type { ListingIntelligenceProfile, ResourceListing } from "@rentorbit/shared";
+import type { ListingIntelligenceProfile, ResourceListing, SearchFilters, SearchIntelligenceMessage } from "@rentorbit/shared";
 
 type OpenAiResponsePayload = {
   output_text?: string;
@@ -17,6 +17,67 @@ export class OpenAiIntelligenceClient {
   private readonly logger = new Logger(OpenAiIntelligenceClient.name);
 
   constructor(private readonly config: ConfigService) {}
+
+  async refineSearchNeed(input: {
+    query: string;
+    filters: SearchFilters;
+    messages: SearchIntelligenceMessage[];
+  }): Promise<string> {
+    const apiKey = this.config.get<string>("OPENAI_API_KEY");
+    const query = input.query.trim();
+
+    if (!apiKey || !query) {
+      return query;
+    }
+
+    const model = this.config.get<string>("OPENAI_INTELLIGENCE_MODEL") ?? "gpt-4.1-mini";
+
+    try {
+      const response = await fetch("https://api.openai.com/v1/responses", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          model,
+          temperature: 0.1,
+          input: [
+            {
+              role: "system",
+              content:
+                "You are RentOrbit search intelligence. Read the ongoing session conversation JSON and return JSON only: {\"refinedNeed\":\"...\"}. Preserve the user's intent. Use tag toggle/reset payloads as preferences, not as literal product needs."
+            },
+            {
+              role: "user",
+              content: [
+                {
+                  type: "input_text",
+                  text: JSON.stringify({
+                    query,
+                    filters: input.filters,
+                    conversation: input.messages.slice(-24)
+                  })
+                }
+              ]
+            }
+          ]
+        })
+      });
+
+      if (!response.ok) {
+        this.logger.warn(`OpenAI search refinement failed with HTTP ${response.status}`);
+        return query;
+      }
+
+      const payload = (await response.json()) as OpenAiResponsePayload;
+      const parsed = this.parseJsonObject(this.extractText(payload));
+      return typeof parsed?.refinedNeed === "string" && parsed.refinedNeed.trim() ? parsed.refinedNeed.trim() : query;
+    } catch (error) {
+      this.logger.warn(`OpenAI search refinement could not run: ${error instanceof Error ? error.message : "unknown error"}`);
+      return query;
+    }
+  }
 
   async enrichListingProfile(listing: ResourceListing, baseProfile: ListingIntelligenceProfile): Promise<ListingIntelligenceProfile> {
     const apiKey = this.config.get<string>("OPENAI_API_KEY");

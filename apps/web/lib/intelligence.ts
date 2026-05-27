@@ -9,6 +9,14 @@ type StartSearchIntelligenceInput = {
   source: "home" | "marketplace";
 };
 
+type SearchConversationInput = {
+  message: string;
+  source: "home" | "marketplace";
+  query?: string;
+  filters?: SearchFilters;
+  payload?: Record<string, unknown>;
+};
+
 type ListingSignalInput = {
   type: ListingLifecycleSignalType;
   value?: string | number | boolean;
@@ -23,7 +31,14 @@ export async function startSearchIntelligenceSession(input: StartSearchIntellige
   const activeSession = readSearchIntelligenceSession();
 
   if (activeSession && isActiveSearchSession(activeSession)) {
-    const continuedSession = await continueSearchIntelligenceSession(activeSession.id, input);
+    const continuedSession = await continueSearchIntelligenceSession(activeSession.id, {
+      ...input,
+      message: `Search updated from ${input.source}: ${input.query || "marketplace filters changed"}`,
+      payload: {
+        kind: "search_update",
+        source: input.source
+      }
+    });
 
     if (continuedSession) {
       return continuedSession;
@@ -106,7 +121,7 @@ export async function recordListingIntelligenceSignal(
 
 async function continueSearchIntelligenceSession(
   sessionId: string,
-  input: StartSearchIntelligenceInput
+  input: SearchConversationInput
 ): Promise<SearchIntelligenceSession | null> {
   const controller = new AbortController();
   const timeout = window.setTimeout(() => controller.abort(), 900);
@@ -119,9 +134,10 @@ async function continueSearchIntelligenceSession(
         "x-rentorbit-search-source": input.source
       },
       body: JSON.stringify({
-        message: `Search updated from ${input.source}: ${input.query || "marketplace filters changed"}`,
+        message: input.message,
         query: input.query,
-        filters: input.filters ?? {}
+        filters: input.filters ?? {},
+        payload: input.payload
       }),
       signal: controller.signal
     });
@@ -139,6 +155,22 @@ async function continueSearchIntelligenceSession(
   } finally {
     window.clearTimeout(timeout);
   }
+}
+
+export async function recordSearchIntelligenceConversation(
+  input: SearchConversationInput
+): Promise<SearchIntelligenceSession | null> {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const activeSession = readSearchIntelligenceSession();
+
+  if (!activeSession || !isActiveSearchSession(activeSession)) {
+    return null;
+  }
+
+  return continueSearchIntelligenceSession(activeSession.id, input);
 }
 
 function isActiveSearchSession(session: SearchIntelligenceSession): boolean {

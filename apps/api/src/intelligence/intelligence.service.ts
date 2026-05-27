@@ -2,6 +2,7 @@ import { Injectable, Logger, NotFoundException, type OnModuleInit } from "@nestj
 import { ConfigService } from "@nestjs/config";
 import {
   buildLocalListingIntelligence,
+  buildSearchIntelligenceTags,
   filterListings,
   rankListingsForNeed,
   type ListingIntelligenceProfile,
@@ -37,6 +38,7 @@ type SearchMessageInput = {
   message: string;
   query?: string;
   filters?: SearchFilters;
+  payload?: Record<string, unknown>;
 };
 
 @Injectable()
@@ -144,13 +146,37 @@ export class IntelligenceService implements OnModuleInit {
     return nextProfile;
   }
 
-  startSearchSession(input: StartSearchSessionInput): SearchIntelligenceSession {
+  async startSearchSession(input: StartSearchSessionInput): Promise<SearchIntelligenceSession> {
     const now = new Date();
     const sessionId = this.hashId(`${input.userId ?? "anonymous"}:${input.query ?? ""}:${now.toISOString()}`);
     const container = this.createContainer("search_session", `${input.userId ?? "anonymous"}:${sessionId}`, this.sessionTtlMs());
     const query = input.query?.trim() ?? "";
     const filters = input.filters ?? {};
-    const recommendations = this.recommend(query, filters);
+    const messages: SearchIntelligenceMessage[] = [
+      {
+        role: "system",
+        content: "RentOrbit search intelligence session opened.",
+        createdAt: now.toISOString()
+      }
+    ];
+
+    if (query) {
+      messages.push({
+        role: "user",
+        content: `Search started: ${query}`,
+        createdAt: now.toISOString(),
+        payload: {
+          kind: "search_update",
+          query,
+          filters
+        }
+      });
+    }
+
+    const refinedQuery = await this.openAiClient.refineSearchNeed({ query, filters, messages });
+    const recommendations = this.recommend(refinedQuery, filters);
+    const filterTags = buildSearchIntelligenceTags(recommendations);
+
     const session: SearchIntelligenceSession = {
       id: sessionId,
       userId: input.userId,
@@ -159,13 +185,8 @@ export class IntelligenceService implements OnModuleInit {
       expiresAt: container.expiresAt ?? new Date(now.getTime() + this.sessionTtlMs()).toISOString(),
       query,
       filters,
-      messages: [
-        {
-          role: "system",
-          content: "RentOrbit search intelligence session opened.",
-          createdAt: now.toISOString()
-        }
-      ],
+      messages,
+      filterTags,
       recommendations
     };
 
@@ -176,7 +197,7 @@ export class IntelligenceService implements OnModuleInit {
     return session;
   }
 
-  continueSearchSession(sessionId: string, input: SearchMessageInput): SearchIntelligenceSession {
+  async continueSearchSession(sessionId: string, input: SearchMessageInput): Promise<SearchIntelligenceSession> {
     const session = store.intelligenceSessions.get(sessionId);
 
     if (!session) {
@@ -187,14 +208,28 @@ export class IntelligenceService implements OnModuleInit {
     const userMessage: SearchIntelligenceMessage = {
       role: "user",
       content: input.message,
-      createdAt: now.toISOString()
+      createdAt: now.toISOString(),
+      payload: input.payload
     };
     const nextQuery = input.query?.trim() || session.query;
     const nextFilters = input.filters ?? session.filters;
-    const combinedNeed = [nextQuery, ...session.messages.filter((message) => message.role === "user").map((message) => message.content), input.message]
+    const needMessages = session.messages
+      .filter((message) => message.role === "user")
+      .filter((message) => {
+        const kind = typeof message.payload?.kind === "string" ? message.payload.kind : "search_update";
+        return kind === "search_update";
+      })
+      .map((message) => message.content);
+    const combinedNeed = [nextQuery, ...needMessages, input.payload?.kind === "search_update" ? input.message : ""]
       .filter(Boolean)
       .join(" ");
-    const recommendations = this.recommend(combinedNeed, nextFilters);
+    const refinedNeed = await this.openAiClient.refineSearchNeed({
+      query: combinedNeed,
+      filters: nextFilters,
+      messages: [...session.messages, userMessage]
+    });
+    const recommendations = this.recommend(refinedNeed, nextFilters);
+    const filterTags = buildSearchIntelligenceTags(recommendations);
     const assistantMessage: SearchIntelligenceMessage = {
       role: "assistant",
       content:
@@ -210,6 +245,7 @@ export class IntelligenceService implements OnModuleInit {
       query: nextQuery,
       filters: nextFilters,
       messages: [...session.messages, userMessage, assistantMessage],
+      filterTags,
       recommendations
     };
 
@@ -238,12 +274,17 @@ export class IntelligenceService implements OnModuleInit {
 
     if (!query.trim()) {
       return candidates
-        .map((listing) => ({
-          listingId: listing.id,
-          score: Number(Math.min(100, listing.rating * 14 + listing.reviewCount / 2).toFixed(1)),
-          reasons: ["popular marketplace item"],
-          profileSummary: profiles.get(listing.id)?.summary ?? `${listing.title}: ${listing.description}`
-        }))
+        .map((listing) => {
+          const scored = rankListingsForNeed(listing.category, [listing], profiles)[0];
+
+          return {
+            listingId: listing.id,
+            score: Number(Math.min(100, listing.rating * 14 + listing.reviewCount / 2).toFixed(1)),
+            reasons: ["popular marketplace item"],
+            matchedTags: scored?.matchedTags ?? [listing.kind, listing.category, listing.location.county],
+            profileSummary: profiles.get(listing.id)?.summary ?? `${listing.title}: ${listing.description}`
+          };
+        })
         .sort((left, right) => right.score - left.score)
         .slice(0, 15);
     }

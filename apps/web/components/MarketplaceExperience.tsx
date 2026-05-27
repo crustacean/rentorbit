@@ -13,6 +13,7 @@ import {
   MapPin,
   MessageCircle,
   PackageCheck,
+  RotateCcw,
   Search,
   SearchX,
   Star,
@@ -24,7 +25,12 @@ import { CustomSelect, type CustomSelectOption } from "@/components/CustomSelect
 import { SiteHeader } from "@/components/SiteHeader";
 import { AuthModal, type AccountMode } from "@/components/AuthModal";
 import { readAccountSession } from "@/lib/accountSession";
-import { readSearchIntelligenceSession, recordListingIntelligenceSignal, startSearchIntelligenceSession } from "@/lib/intelligence";
+import {
+  readSearchIntelligenceSession,
+  recordListingIntelligenceSignal,
+  recordSearchIntelligenceConversation,
+  startSearchIntelligenceSession
+} from "@/lib/intelligence";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import {
@@ -42,6 +48,7 @@ import {
   type ResourceListing,
   type SearchFilters,
   type SearchIntelligenceSession,
+  type SearchIntelligenceTag,
   type SearchResult
 } from "@rentorbit/shared";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -126,10 +133,19 @@ type SavedMarketplaceListing = {
   category: string;
 };
 
+type AiTagState = {
+  id: string;
+  label: string;
+  color: string;
+  textColor: string;
+  active: boolean;
+};
+
 const marketplaceThreadsKey = "rentorbit:marketplace-chat-threads";
 const marketplaceThreadsUpdatedEvent = "rentorbit:marketplace-chats-updated";
 const savedListingsKey = "rentorbit:saved-marketplace-listings";
 const savedListingsUpdatedEvent = "rentorbit:saved-listings-updated";
+const aiTagStateKey = "rentorbit:marketplace-ai-tag-state";
 
 const initialFilters: FilterState = {
   query: "",
@@ -268,6 +284,77 @@ function orderResultsByIntelligence(
   return intelligenceSession.recommendations
     .map((recommendation) => resultsById.get(recommendation.listingId))
     .filter((result): result is SearchResult => Boolean(result));
+}
+
+function readAiTagStates(): Record<string, AiTagState> {
+  if (typeof window === "undefined") {
+    return {};
+  }
+
+  try {
+    const parsed = JSON.parse(window.sessionStorage.getItem(aiTagStateKey) ?? "{}");
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as Record<string, AiTagState>) : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeAiTagStates(states: Record<string, AiTagState>) {
+  window.sessionStorage.setItem(aiTagStateKey, JSON.stringify(states));
+}
+
+function mergeAiTagStates(
+  tags: SearchIntelligenceTag[],
+  previousStates: Record<string, AiTagState>
+): Record<string, AiTagState> {
+  return Object.fromEntries(
+    tags.map((tag) => {
+      const previous = previousStates[tag.id];
+      return [
+        tag.id,
+        {
+          id: tag.id,
+          label: tag.label,
+          color: previous?.color ?? tag.color,
+          textColor: previous?.textColor ?? tag.textColor,
+          active: previous?.active ?? true
+        }
+      ];
+    })
+  );
+}
+
+function activeAiTags(tags: SearchIntelligenceTag[], states: Record<string, AiTagState>): AiTagState[] {
+  return tags.map((tag) => states[tag.id] ?? { ...tag, active: true });
+}
+
+function tagIdFromLabel(label: string): string {
+  return label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+}
+
+function applyAiTagDropRule(
+  orderedResults: SearchResult[],
+  intelligenceSession: SearchIntelligenceSession | null,
+  tagStates: Record<string, AiTagState>
+): SearchResult[] {
+  if (!intelligenceSession?.filterTags?.length) {
+    return orderedResults;
+  }
+
+  const recommendationsByListingId = new Map(intelligenceSession.recommendations.map((recommendation) => [recommendation.listingId, recommendation]));
+  const knownTagIds = new Set(intelligenceSession.filterTags.map((tag) => tag.id));
+
+  return orderedResults.filter((result) => {
+    const recommendation = recommendationsByListingId.get(result.listing.id);
+    const matchedTagIds = recommendation?.matchedTags.map(tagIdFromLabel).filter((id) => knownTagIds.has(id)) ?? [];
+
+    if (matchedTagIds.length === 0) {
+      return true;
+    }
+
+    const disabledCount = matchedTagIds.filter((id) => tagStates[id]?.active === false).length;
+    return disabledCount / matchedTagIds.length <= 0.7;
+  });
 }
 
 function readMarketplaceThreads(): AccountChatThread[] {
@@ -412,11 +499,17 @@ export function MarketplaceExperience() {
   const [bookingQuantity, setBookingQuantity] = useState("1");
   const [bookedUnitCounts] = useState<Record<string, number>>(seededBookedUnits);
   const [intelligenceSession, setIntelligenceSession] = useState<SearchIntelligenceSession | null>(null);
+  const [aiTagStates, setAiTagStates] = useState<Record<string, AiTagState>>({});
+  const [aiTagsCleared, setAiTagsCleared] = useState(false);
 
   useEffect(registerServiceWorker, []);
 
   useEffect(() => {
-    setIntelligenceSession(readSearchIntelligenceSession());
+    const existingIntelligenceSession = readSearchIntelligenceSession();
+    setIntelligenceSession(existingIntelligenceSession);
+    if (existingIntelligenceSession?.filterTags?.length) {
+      setAiTagStates(mergeAiTagStates(existingIntelligenceSession.filterTags, readAiTagStates()));
+    }
 
     const params = new URLSearchParams(window.location.search);
     const requestedListingId = params.get("listing");
@@ -507,13 +600,21 @@ export function MarketplaceExperience() {
     () => orderResultsByIntelligence(intelligenceCandidateResults, intelligenceSession),
     [intelligenceCandidateResults, intelligenceSession]
   );
-  const results = useMemo(() => {
+  const rawResults = useMemo(() => {
     if (filters.query.trim() && intelligenceResults.length > 0) {
       return intelligenceResults;
     }
 
     return exactResults;
   }, [exactResults, filters.query, intelligenceResults]);
+  const results = useMemo(
+    () => applyAiTagDropRule(rawResults, intelligenceSession, aiTagStates),
+    [aiTagStates, intelligenceSession, rawResults]
+  );
+  const visibleAiTags = useMemo(
+    () => (aiTagsCleared ? [] : activeAiTags(intelligenceSession?.filterTags?.slice(0, 20) ?? [], aiTagStates)),
+    [aiTagStates, aiTagsCleared, intelligenceSession]
+  );
 
   useEffect(() => {
     const hasSpecificNeed =
@@ -535,6 +636,12 @@ export function MarketplaceExperience() {
       }).then((session) => {
         if (session) {
           setIntelligenceSession(session);
+          setAiTagsCleared(false);
+          setAiTagStates((current) => {
+            const next = mergeAiTagStates(session.filterTags, { ...readAiTagStates(), ...current });
+            writeAiTagStates(next);
+            return next;
+          });
         }
       });
     }, 550);
@@ -650,6 +757,84 @@ export function MarketplaceExperience() {
     setFilters((current) => normalizeFilterWindow(current, next));
   }
 
+  function toggleAiTag(tagId: string) {
+    setAiTagStates((current) => {
+      const existing = current[tagId];
+      if (!existing) {
+        return current;
+      }
+
+      const nextActive = !existing.active;
+      const next = {
+        ...current,
+        [tagId]: {
+          ...existing,
+          active: nextActive
+        }
+      };
+      writeAiTagStates(next);
+      void recordSearchIntelligenceConversation({
+        source: "marketplace",
+        query: filters.query.trim() || "marketplace discovery",
+        filters: buildMarketplaceSearchFilters(filters, false),
+        message: `${nextActive ? "AI tag restored" : "AI tag removed"}: ${existing.label}`,
+        payload: {
+          kind: "tag_toggle",
+          tagId,
+          label: existing.label,
+          active: nextActive,
+          activeTagIds: Object.values(next)
+            .filter((tag) => tag.active)
+            .map((tag) => tag.id),
+          disabledTagIds: Object.values(next)
+            .filter((tag) => !tag.active)
+            .map((tag) => tag.id)
+        }
+      }).then((session) => {
+        if (session) {
+          setIntelligenceSession(session);
+        }
+      });
+      return next;
+    });
+  }
+
+  function resetAiTags() {
+    if (!intelligenceSession?.filterTags?.length) {
+      return;
+    }
+
+    const next = Object.fromEntries(
+      intelligenceSession.filterTags.map((tag) => [
+        tag.id,
+        {
+          id: tag.id,
+          label: tag.label,
+          color: aiTagStates[tag.id]?.color ?? tag.color,
+          textColor: aiTagStates[tag.id]?.textColor ?? tag.textColor,
+          active: false
+        }
+      ])
+    );
+    writeAiTagStates(next);
+    setAiTagStates(next);
+    setAiTagsCleared(true);
+    void recordSearchIntelligenceConversation({
+      source: "marketplace",
+      query: filters.query.trim() || "marketplace discovery",
+      filters: buildMarketplaceSearchFilters(filters, false),
+      message: "AI filter tags reset and cleared.",
+      payload: {
+        kind: "tag_reset",
+        disabledTagIds: Object.keys(next)
+      }
+    }).then((session) => {
+      if (session) {
+        setIntelligenceSession(session);
+      }
+    });
+  }
+
   function clearFilters() {
     if (!firstListing) {
       return;
@@ -659,6 +844,7 @@ export function MarketplaceExperience() {
     setSelectedId(firstListing.id);
     setSelectedMode(firstListing.modeRules[0]?.mode ?? "self_operated");
     setBookingQuantity("1");
+    resetAiTags();
     setContract(null);
   }
 
@@ -826,9 +1012,15 @@ export function MarketplaceExperience() {
       {mobilePanel ? (
         <MobilePanelOverlay title={panelTitle(mobilePanel)} onClose={() => setMobilePanel(null)}>
           {mobilePanel === "discovery" ? (
-            <DiscoveryPanel filters={filters} patchFilters={patchFilters} />
+            <DiscoveryPanel
+              filters={filters}
+              patchFilters={patchFilters}
+              aiTags={visibleAiTags}
+              onToggleAiTag={toggleAiTag}
+              onResetAiTags={resetAiTags}
+            />
           ) : null}
-          {mobilePanel === "metrics" ? <MarketplaceSummaryPanel filters={filters} resultsLength={results.length} /> : null}
+          {mobilePanel === "metrics" ? <MarketplaceSummaryPanel resultsLength={results.length} /> : null}
           {mobilePanel === "details" ? (
             <ListingDetailsPanel
               selectedListing={selectedListing}
@@ -851,11 +1043,17 @@ export function MarketplaceExperience() {
 
       <div className="grid min-h-[calc(100svh-81px)] min-w-0 w-full gap-3 px-3 py-3 xl:h-[calc(100svh-81px)] xl:overflow-hidden xl:grid-cols-[280px_minmax(0,1fr)_360px] 2xl:grid-cols-[300px_minmax(0,1fr)_380px]">
         <aside className="hidden min-w-0 h-fit self-start xl:sticky xl:top-0 xl:block xl:max-h-full xl:overflow-x-hidden xl:overflow-y-visible">
-          <DiscoveryPanel filters={filters} patchFilters={patchFilters} />
+          <DiscoveryPanel
+            filters={filters}
+            patchFilters={patchFilters}
+            aiTags={visibleAiTags}
+            onToggleAiTag={toggleAiTag}
+            onResetAiTags={resetAiTags}
+          />
         </aside>
 
         <section className="grid min-w-0 content-start gap-3 xl:h-full xl:overflow-y-auto xl:pr-1">
-          <MarketplaceSummaryPanel filters={filters} resultsLength={results.length} className="hidden xl:grid" />
+          <MarketplaceSummaryPanel resultsLength={results.length} className="hidden xl:grid" />
 
           <div className="grid gap-3">
             <div className="rounded-[30px] bg-orbit-panel/35 p-3">
@@ -1201,13 +1399,19 @@ function MobilePanelOverlay({
 
 function DiscoveryPanel({
   filters,
-  patchFilters
+  patchFilters,
+  aiTags,
+  onToggleAiTag,
+  onResetAiTags
 }: {
   filters: FilterState;
   patchFilters: (next: Partial<FilterState>) => void;
+  aiTags: AiTagState[];
+  onToggleAiTag: (tagId: string) => void;
+  onResetAiTags: () => void;
 }) {
   return (
-    <section className="theme-body-border m-[2px] max-h-full min-w-0 overflow-y-auto overflow-x-hidden rounded-[36px] bg-orbit-panel/92 p-5 ring-1 ring-white/70">
+    <section className="theme-body-border m-[2px] min-w-0 overflow-y-auto overflow-x-hidden rounded-[36px] bg-orbit-panel/92 p-5 ring-1 ring-white/70">
       <div className="mb-4 flex items-center justify-between">
         <h2 className="text-base font-bold">Discovery</h2>
         <button className="rounded-full bg-orbit-field p-2 text-orbit-green" title="Filter listings">
@@ -1228,6 +1432,44 @@ function DiscoveryPanel({
           />
         </div>
       </label>
+
+      {aiTags.length > 0 ? (
+        <div className="mb-4">
+          <p className="mb-3 text-xs font-black uppercase tracking-wide text-neutral-500">
+            Click a tag to remove it from your search
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {aiTags.map((tag) => (
+              <button
+                key={tag.id}
+                type="button"
+                onClick={() => onToggleAiTag(tag.id)}
+                className="ai-filter-tag inline-flex min-h-10 items-center rounded-full px-4 text-xs font-black transition-colors focus-visible:outline-none"
+                data-active={tag.active ? "true" : "false"}
+                style={
+                  tag.active
+                    ? {
+                        backgroundColor: tag.color,
+                        color: tag.textColor
+                      }
+                    : undefined
+                }
+                title={tag.active ? `Remove ${tag.label} from this search` : `Add ${tag.label} back to this search`}
+              >
+                {tag.label}
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={onResetAiTags}
+            className="orbit-cta-gold mt-4 inline-flex min-h-12 w-full items-center justify-center gap-3 rounded-[14px] px-4 text-sm font-black shadow-[0_12px_24px_rgba(239,191,4,0.18)] focus-visible:outline-none"
+          >
+            <RotateCcw className="h-5 w-5" aria-hidden="true" />
+            Reset AI Filters
+          </button>
+        </div>
+      ) : null}
 
       <div className="grid gap-3">
         <FilterSelect
@@ -1294,11 +1536,9 @@ function DiscoveryPanel({
 }
 
 function MarketplaceSummaryPanel({
-  filters,
   resultsLength,
   className = "grid"
 }: {
-  filters: FilterState;
   resultsLength: number;
   className?: string;
 }) {
@@ -1306,10 +1546,10 @@ function MarketplaceSummaryPanel({
     <div className={`theme-body-border ${className} m-[2px] gap-3 rounded-[36px] bg-orbit-panel/92 p-5 ring-1 ring-white/70 lg:grid-cols-[1fr_280px]`}>
       <div>
         <div className="flex items-center gap-2 text-sm font-bold text-orbit-green">
-          <MapPin className="h-4 w-4" aria-hidden="true" />
-          {filters.county === "all" ? "Countrywide marketplace" : `${filters.county} marketplace`}
+          <Search className="h-4 w-4" aria-hidden="true" />
+          AI Recommended listings
         </div>
-        <h2 className="mt-2 text-2xl font-black text-orbit-ink">All-category availability board</h2>
+        <h2 className="mt-2 text-2xl font-black text-orbit-ink">All category availability</h2>
         <p className="mt-1 max-w-3xl text-sm leading-6 text-neutral-600">
           {resultsLength} matching resources across goods, services, and personnel.
         </p>
