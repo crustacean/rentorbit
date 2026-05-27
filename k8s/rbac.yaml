@@ -1,0 +1,62 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: rentorbit-deployer
+  namespace: ${KUBE_NAMESPACE}
+  labels:
+    app.kubernetes.io/name: rentorbit
+    app.kubernetes.io/part-of: rentorbit
+rules:
+  - apiGroups: [""]
+    resources:
+      - configmaps
+      - pods
+      - services
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete
+  - apiGroups: ["apps"]
+    resources:
+      - deployments
+      - replicasets
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete
+  - apiGroups: ["networking.k8s.io"]
+    resources:
+      - ingresses
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: rentorbit-deployer
+  namespace: ${KUBE_NAMESPACE}
+  labels:
+    app.kubernetes.io/name: rentorbit
+    app.kubernetes.io/part-of: rentorbit
+subjects:
+  - kind: ServiceAccount
+    name: ${KUBE_SERVICE_ACCOUNT_NAME}
+    namespace: ${KUBE_SERVICE_ACCOUNT_NAMESPACE}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: rentorbit-deployer

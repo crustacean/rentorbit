@@ -10,7 +10,6 @@ pipeline {
 
         DOCKER_CREDENTIALS = 'docker-hub-credentials'
 
-        KUBE_CA_CERT = 'minikube-ca-cert'
         KUBE_CLUSTER = 'minikube'
         KUBE_CONTEXT = 'minikube'
         KUBE_CREDENTIALS = 'minikube-jenkins-secret'
@@ -199,7 +198,6 @@ def deployToKubernetes() {
     env.API_IMAGE = "${env.API_IMAGE_NAME}:${env.IMAGE_TAG}"
 
     withKubeConfig(
-        caCertificateId: env.KUBE_CA_CERT,
         clusterName: env.KUBE_CLUSTER,
         contextName: env.KUBE_CONTEXT,
         credentialsId: env.KUBE_CREDENTIALS,
