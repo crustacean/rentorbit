@@ -2,6 +2,7 @@
 
 import { Check, ChevronDown } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
+import { ui } from "@/lib/ui";
 
 export type CustomSelectOption = {
   value: string;
@@ -24,9 +25,9 @@ export type CustomSelectProps = {
   arrowClassName?: string;
 };
 
-const defaultLabelClass = "mb-1 block text-xs font-semibold uppercase text-orbit-ink/55";
+const defaultLabelClass = ui.label;
 const defaultButtonClass =
-  "flex min-h-10 w-full items-center gap-3 rounded-[18px] bg-orbit-panel py-2 pl-3 pr-2 text-left text-sm font-semibold text-orbit-ink outline-none shadow-[inset_0_0_0_1px_rgb(255_255_255_/_0.22)] transition hover:bg-orbit-soft/45 focus:outline-none focus:ring-0 focus-visible:outline-none";
+  "flex min-h-10 w-full items-center gap-3 rounded-[18px] bg-orbit-panel py-2 pl-3 pr-2 text-left text-sm font-semibold text-orbit-ink outline-none shadow-[inset_0_0_0_1px_rgb(255_255_255_/_0.22)] transition-colors hover:bg-orbit-soft/45 focus:outline-none focus:ring-0 focus-visible:outline-none";
 const defaultArrowClass =
   "flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-orbit-panel/75 text-orbit-ink";
 const defaultMenuClass =

@@ -31,6 +31,7 @@ import {
   recordSearchIntelligenceConversation,
   startSearchIntelligenceSession
 } from "@/lib/intelligence";
+import { cn, ui } from "@/lib/ui";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import {
@@ -1067,11 +1068,12 @@ export function MarketplaceExperience() {
             <div className="rounded-[30px] bg-orbit-panel/35 p-3">
               {results.length > 0 ? (
                 <div className="grid gap-x-3 gap-y-3 lg:grid-cols-2 2xl:grid-cols-3">
-                  {results.map((result) => (
+                  {results.map((result, index) => (
                     <MarketplaceListingCard
                       key={result.listing.id}
                       result={result}
                       selected={selectedListing.id === result.listing.id}
+                      deferRendering={index > 5}
                       saved={savedListingIds.includes(result.listing.id)}
                       onSelect={() => selectListing(result.listing)}
                       onOpen={() => openFocusedListing(result.listing)}
@@ -1419,7 +1421,7 @@ function DiscoveryPanel({
   onResetAiTags: () => void;
 }) {
   return (
-    <section className="theme-body-border m-[2px] min-w-0 overflow-y-auto overflow-x-hidden rounded-[36px] bg-orbit-panel/92 p-5 ring-1 ring-white/70">
+    <section className={cn(ui.surface, "overflow-y-auto overflow-x-hidden p-5")}>
       <div className="mb-4 flex items-center justify-between">
         <h2 className="text-base font-bold">Discovery</h2>
         <button className="rounded-full bg-orbit-field p-2 text-orbit-green" title="Filter listings">
@@ -1429,7 +1431,7 @@ function DiscoveryPanel({
 
       <label className="mb-3 block">
         <span className="mb-1 block text-xs font-semibold uppercase text-neutral-500">Search</span>
-        <div className="theme-body-border flex min-h-14 items-center gap-2 rounded-full bg-orbit-panel p-2 shadow-[0_2px_14px_rgba(25,32,29,0.08)] transition-colors focus-within:outline-none focus-within:ring-0">
+        <div className={cn(ui.searchShell, "min-h-14")}>
           <Search className="ml-2 h-5 w-5 shrink-0 text-orbit-ink/55" aria-hidden="true" />
           <input
             value={filters.query}
@@ -1471,7 +1473,7 @@ function DiscoveryPanel({
           <button
             type="button"
             onClick={onResetAiTags}
-            className="orbit-cta-gold mt-4 inline-flex min-h-12 w-full items-center justify-center gap-3 rounded-[14px] px-4 text-sm font-black shadow-[0_12px_24px_rgba(239,191,4,0.18)] focus-visible:outline-none"
+            className={cn(ui.goldPill, "mt-4 min-h-12 w-full rounded-[14px] px-4 text-sm shadow-[0_12px_24px_rgba(239,191,4,0.18)]")}
           >
             <RotateCcw className="h-5 w-5" aria-hidden="true" />
             Reset AI Filters
@@ -1551,7 +1553,7 @@ function MarketplaceSummaryPanel({
   className?: string;
 }) {
   return (
-    <div className={`theme-body-border ${className} m-[2px] gap-3 rounded-[36px] bg-orbit-panel/92 p-5 ring-1 ring-white/70 lg:grid-cols-[1fr_280px]`}>
+    <div className={cn(ui.surface, className, "gap-3 p-5 lg:grid-cols-[1fr_280px]")}>
       <div>
         <div className="flex items-center gap-2 text-sm font-bold text-orbit-green">
           <Search className="h-4 w-4" aria-hidden="true" />
@@ -1601,7 +1603,7 @@ function ListingDetailsPanel({
   proposeBooking: () => void;
 }) {
   return (
-    <section className="theme-body-border m-[2px] max-h-full min-w-0 overflow-y-auto overflow-x-hidden rounded-[36px] bg-orbit-panel/92 p-5 ring-1 ring-white/70">
+    <section className={cn(ui.surface, "max-h-full overflow-y-auto overflow-x-hidden p-5")}>
       <BookingDetailsContent
         listing={selectedListing}
         publicCoordinates={selectedPublicCoordinates}
@@ -1891,6 +1893,7 @@ function FilterSelect({
 function MarketplaceListingCard({
   result,
   selected,
+  deferRendering,
   saved,
   onSelect,
   onOpen,
@@ -1898,6 +1901,7 @@ function MarketplaceListingCard({
 }: {
   result: SearchResult;
   selected: boolean;
+  deferRendering?: boolean;
   saved: boolean;
   onSelect: () => void;
   onOpen: () => void;
@@ -1923,7 +1927,10 @@ function MarketplaceListingCard({
       aria-pressed={selected}
       data-selected={selected ? "true" : "false"}
       data-listing-id={listing.id}
-      className="grid min-h-[240px] cursor-pointer overflow-hidden rounded-[30px] border-2 border-transparent bg-orbit-panel p-4 text-left shadow-[0_2px_14px_rgba(25,32,29,0.12)] transition-shadow data-[selected=true]:border-orbit-green hover:shadow-[0_2px_14px_rgba(25,32,29,0.18)] focus-visible:border-orbit-green focus-visible:outline-none focus-visible:shadow-[0_2px_14px_rgba(25,32,29,0.12)] md:min-h-[clamp(220px,16vw,270px)] md:grid-cols-[minmax(0,1fr)_40%]"
+      className={cn(
+        "grid min-h-[240px] cursor-pointer overflow-hidden rounded-[30px] border-2 border-transparent bg-orbit-panel p-4 text-left shadow-[0_2px_14px_rgba(25,32,29,0.12)] transition-shadow data-[selected=true]:border-orbit-green hover:shadow-[0_2px_14px_rgba(25,32,29,0.18)] focus-visible:border-orbit-green focus-visible:outline-none focus-visible:shadow-[0_2px_14px_rgba(25,32,29,0.12)] md:min-h-[clamp(220px,16vw,270px)] md:grid-cols-[minmax(0,1fr)_40%]",
+        deferRendering ? "defer-below-fold" : null
+      )}
     >
       <div className="flex min-w-0 flex-col justify-between gap-3 overflow-hidden pr-0 md:pr-3">
         <div>
@@ -1961,7 +1968,7 @@ function MarketplaceListingCard({
             alt={media?.alt ?? listing.title}
             loading={selected ? "eager" : "lazy"}
             decoding="async"
-            fetchPriority={selected ? "high" : "low"}
+            fetchPriority={selected ? "high" : undefined}
             width={640}
             height={360}
             className={`absolute inset-0 z-0 h-full w-full object-cover ${unavailable ? "grayscale" : ""}`}

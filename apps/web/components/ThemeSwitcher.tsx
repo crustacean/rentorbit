@@ -2,6 +2,7 @@
 
 import { Moon, Sun } from "lucide-react";
 import { useEffect, useState } from "react";
+import { cn, ui } from "@/lib/ui";
 
 type ThemeMode = "light" | "dark";
 
@@ -41,7 +42,7 @@ export function ThemeSwitcher({ compact: _compact = false }: { compact?: boolean
     <button
       type="button"
       onClick={toggleMode}
-      className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-orbit-line bg-orbit-panel/90 p-[3px] text-orbit-ink shadow-panel backdrop-blur transition-colors hover:bg-orbit-soft/80 focus-visible:outline-none"
+      className={cn(ui.iconButton, "h-11 w-11 border border-orbit-line bg-orbit-panel/90 p-[3px] shadow-panel backdrop-blur")}
       aria-label={`Switch to ${nextLabel} mode`}
       title={`${activeMode.label} mode`}
     >

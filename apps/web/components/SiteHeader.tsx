@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { AuthModal, type AccountMode } from "@/components/AuthModal";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import { accountSessionUpdatedEvent, clearAccountSession, readAccountSession } from "@/lib/accountSession";
+import { cn, ui } from "@/lib/ui";
 
 type SiteHeaderActive = "home" | "rent" | "account";
 
@@ -110,7 +111,7 @@ export function SiteHeader({ active = "home", sessionEmail, onSignOut }: SiteHea
             {isSignedIn ? (
               <Link
                 href="/account"
-                className="inline-flex min-h-11 w-[74px] items-center justify-center rounded-full bg-orbit-panel px-2 text-[11px] font-black text-orbit-ink ring-1 ring-orbit-line/70 transition-colors hover:bg-orbit-soft focus-visible:outline-none sm:w-[92px] sm:text-sm"
+                className={cn(ui.panelPill, "min-h-11 w-[74px] px-2 text-[11px] sm:w-[92px] sm:text-sm")}
               >
                 Account
               </Link>
@@ -118,7 +119,7 @@ export function SiteHeader({ active = "home", sessionEmail, onSignOut }: SiteHea
               <button
                 type="button"
                 onClick={() => openAuthModal("signin")}
-                className="inline-flex min-h-11 w-[74px] items-center justify-center rounded-full bg-orbit-panel px-2 text-[11px] font-black text-orbit-ink ring-1 ring-orbit-line/70 transition-colors hover:bg-orbit-soft focus-visible:outline-none sm:w-[92px] sm:text-sm"
+                className={cn(ui.panelPill, "min-h-11 w-[74px] px-2 text-[11px] sm:w-[92px] sm:text-sm")}
               >
                 Sign In
               </button>
@@ -127,7 +128,7 @@ export function SiteHeader({ active = "home", sessionEmail, onSignOut }: SiteHea
               <button
                 type="button"
                 onClick={handleSignOut}
-                className="inline-flex min-h-11 w-[78px] items-center justify-center rounded-full bg-[#EFBF04] px-2 text-[11px] font-black text-[#1a1a1a] transition-colors hover:bg-[#d9ad03] focus-visible:outline-none sm:w-[92px] sm:text-sm"
+                className={cn(ui.goldPill, "min-h-11 w-[78px] px-2 text-[11px] sm:w-[92px] sm:text-sm")}
               >
                 Sign out
               </button>
@@ -135,7 +136,7 @@ export function SiteHeader({ active = "home", sessionEmail, onSignOut }: SiteHea
               <button
                 type="button"
                 onClick={() => openAuthModal("signup")}
-                className="inline-flex min-h-11 w-[74px] items-center justify-center rounded-full bg-[#EFBF04] px-2 text-[11px] font-black text-[#1a1a1a] transition-colors hover:bg-[#d9ad03] focus-visible:outline-none sm:w-[92px] sm:text-sm"
+                className={cn(ui.goldPill, "min-h-11 w-[74px] px-2 text-[11px] sm:w-[92px] sm:text-sm")}
               >
                 Sign Up
               </button>

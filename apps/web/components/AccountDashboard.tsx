@@ -38,6 +38,7 @@ import {
   processListingImageFile,
   type ListingImageCropFocus
 } from "@/lib/listingImageUpload";
+import { cn, ui } from "@/lib/ui";
 import { calculateBookingQuote, publicLocationOffset, seededListings, type Coordinates, type OperationMode, type ResourceListing } from "@rentorbit/shared";
 import { useEffect, useMemo, useState, type CSSProperties, type Dispatch, type SetStateAction } from "react";
 
@@ -537,9 +538,8 @@ const initialThreads: ChatThread[] = [
 ];
 
 const panelClass = "theme-body-border rounded-[36px] bg-orbit-panel/92 ring-1 ring-white/70";
-const fieldClass =
-  "w-full rounded-[18px] bg-orbit-panel px-3 py-2 text-sm font-semibold text-orbit-ink outline-none shadow-[inset_0_0_0_1px_rgb(255_255_255_/_0.22)] focus:outline-none focus:ring-0 focus-visible:outline-none";
-const labelClass = "mb-1 block text-xs font-semibold uppercase text-orbit-ink/55";
+const fieldClass = cn(ui.field, "bg-orbit-panel shadow-[inset_0_0_0_1px_rgb(255_255_255_/_0.22)]");
+const labelClass = ui.label;
 const listingKindOptions: CustomSelectOption[] = [
   { value: "good", label: "Goods" },
   { value: "service", label: "Services" },
@@ -1984,6 +1984,9 @@ function AccountFocusedListingOverlay({
               <img
                 src={image.url}
                 alt={image.alt || listing.title}
+                loading="eager"
+                decoding="async"
+                fetchPriority="high"
                 className="max-h-full max-w-full select-none object-contain transition-transform duration-200 ease-out"
                 style={{ transform: `scale(${zoom})`, transformOrigin: "center center" }}
               />

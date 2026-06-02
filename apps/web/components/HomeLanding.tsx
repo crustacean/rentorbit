@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
 import { startSearchIntelligenceSession } from "@/lib/intelligence";
+import { cn, ui } from "@/lib/ui";
 import { seededListings, type ResourceListing } from "@rentorbit/shared";
 
 const featuredListings = [...seededListings]
@@ -58,7 +59,7 @@ export function HomeLanding() {
         </p>
 
         <form onSubmit={handleSearch} className="mt-10 w-full max-w-2xl" role="search">
-          <div className="theme-body-border flex min-h-[68px] items-center gap-2 rounded-full bg-orbit-panel p-2 shadow-[0_2px_14px_rgba(25,32,29,0.08)] transition-colors">
+          <div className={cn(ui.searchShell, "min-h-[68px]")}>
             <Search className="ml-3 h-6 w-6 shrink-0 text-orbit-ink/55" aria-hidden="true" />
             <input
               value={searchTerm}
@@ -69,7 +70,7 @@ export function HomeLanding() {
             />
             <button
               type="submit"
-              className="inline-flex min-h-12 shrink-0 items-center justify-center rounded-full bg-[#EFBF04] px-5 text-xs font-black text-[#1a1a1a] transition-colors hover:bg-[#d9ad03] focus-visible:outline-none sm:px-8 sm:text-sm"
+              className={cn(ui.goldPill, "min-h-12 shrink-0 px-5 text-xs sm:px-8 sm:text-sm")}
             >
               Search
             </button>
@@ -80,7 +81,7 @@ export function HomeLanding() {
               <Link
                 key={item.label}
                 href={item.href}
-                className="theme-body-border inline-flex shrink-0 items-center justify-center rounded-full border border-orbit-line/70 bg-orbit-panel/45 px-4 py-2 text-xs font-black text-orbit-ink/66 transition-colors hover:bg-orbit-panel hover:text-orbit-green focus-visible:outline-none"
+                className={cn(ui.panelPill, "theme-body-border shrink-0 border border-orbit-line/70 bg-orbit-panel/45 px-4 py-2 text-xs text-orbit-ink/66 hover:bg-orbit-panel hover:text-orbit-green")}
               >
                 {item.label}
               </Link>
@@ -102,8 +103,8 @@ export function HomeLanding() {
         </div>
 
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {featuredListings.map((listing) => (
-            <FeaturedRentalCard key={listing.id} listing={listing} />
+          {featuredListings.map((listing, index) => (
+            <FeaturedRentalCard key={listing.id} listing={listing} priority={index === 0} />
           ))}
         </div>
       </section>
@@ -130,7 +131,7 @@ export function HomeLanding() {
   );
 }
 
-function FeaturedRentalCard({ listing }: { listing: ResourceListing }) {
+function FeaturedRentalCard({ listing, priority }: { listing: ResourceListing; priority: boolean }) {
   const media = listing.media[0];
   const price = kes(listing.modeRules[0]?.pricing.rate.amount ?? 0);
 
@@ -144,8 +145,9 @@ function FeaturedRentalCard({ listing }: { listing: ResourceListing }) {
           <img
             src={media.url}
             alt={media.alt || listing.title}
-            loading="eager"
+            loading={priority ? "eager" : "lazy"}
             decoding="async"
+            fetchPriority={priority ? "high" : undefined}
             className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.03]"
           />
         ) : null}

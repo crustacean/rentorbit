@@ -166,6 +166,7 @@ export function FocusedListingOverlay({
                 alt={image.alt || listing.title}
                 loading="eager"
                 decoding="async"
+                fetchPriority="high"
                 className="max-h-full max-w-full select-none object-contain transition-transform duration-200 ease-out"
                 style={{ transform: `scale(${zoom})`, transformOrigin: "center center" }}
               />

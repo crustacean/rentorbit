@@ -19,3 +19,5 @@ DESIGN.MD
 AGENDA.MD
 CHANGELOG.MD
 logs
+.agents
+skills-lock.json
