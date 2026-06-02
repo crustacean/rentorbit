@@ -104,6 +104,46 @@ textarea:focus-visible {
   overflow-y: auto;
 }
 
+.marketplace-search-shell {
+  isolation: isolate;
+  position: relative;
+}
+
+.marketplace-search-shell::before {
+  animation: orbit-search-border 1.4s linear infinite;
+  background: conic-gradient(from 0deg, #efbf04, #4391f5, #10b981, #8b5cf6, #efbf04);
+  border-radius: inherit;
+  content: "";
+  inset: 0;
+  opacity: 0;
+  padding: 2px;
+  pointer-events: none;
+  position: absolute;
+  transition: opacity 180ms ease;
+  z-index: 0;
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+}
+
+.marketplace-search-shell[data-searching="true"]::before {
+  opacity: 1;
+}
+
+@keyframes orbit-search-border {
+  to {
+    transform: rotate(1turn);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marketplace-search-shell::before {
+    animation: none;
+  }
+}
+
 @supports (content-visibility: auto) {
   .defer-below-fold {
     content-visibility: auto;

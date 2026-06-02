@@ -23,6 +23,7 @@ COPY . .
 RUN npm run build --workspace @rentorbit/shared
 RUN npm run build --workspace @rentorbit/api
 RUN npm run build --workspace @rentorbit/web
+RUN mkdir -p apps/api/data/intelligence/listings
 RUN npm prune --omit=dev
 
 FROM node:22-bookworm-slim AS web
@@ -54,6 +55,7 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/apps/api/package.json ./apps/api/package.json
 COPY --from=builder /app/apps/api/node_modules ./apps/api/node_modules
 COPY --from=builder /app/apps/api/dist ./apps/api/dist
+COPY --from=builder /app/apps/api/data ./apps/api/data
 COPY --from=builder /app/apps/api/prisma ./apps/api/prisma
 COPY --from=builder /app/packages/shared/package.json ./packages/shared/package.json
 COPY --from=builder /app/packages/shared/dist ./packages/shared/dist

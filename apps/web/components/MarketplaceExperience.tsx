@@ -107,6 +107,7 @@ type ChatLine = {
 
 type MobilePanel = "discovery" | "metrics" | "details";
 type FocusedPanel = "details" | "chat";
+type SearchStatus = "idle" | "pending" | "complete";
 
 type AccountChatMessage = {
   id: string;
@@ -510,6 +511,8 @@ export function MarketplaceExperience() {
   const [intelligenceSession, setIntelligenceSession] = useState<SearchIntelligenceSession | null>(null);
   const [aiTagStates, setAiTagStates] = useState<Record<string, AiTagState>>({});
   const [aiTagsCleared, setAiTagsCleared] = useState(false);
+  const [searchStatus, setSearchStatus] = useState<SearchStatus>("idle");
+  const searchRequestIdRef = useRef(0);
 
   useEffect(registerServiceWorker, []);
 
@@ -610,12 +613,12 @@ export function MarketplaceExperience() {
     [intelligenceCandidateResults, intelligenceSession]
   );
   const rawResults = useMemo(() => {
-    if (filters.query.trim() && intelligenceResults.length > 0) {
+    if (filters.query.trim() && intelligenceSession) {
       return intelligenceResults;
     }
 
     return exactResults;
-  }, [exactResults, filters.query, intelligenceResults]);
+  }, [exactResults, filters.query, intelligenceResults, intelligenceSession]);
   const results = useMemo(
     () => applyAiTagDropRule(rawResults, intelligenceSession, aiTagStates),
     [aiTagStates, intelligenceSession, rawResults]
@@ -634,12 +637,23 @@ export function MarketplaceExperience() {
       !filters.includeCountrywide;
 
     if (aiTagsCleared && !filters.query.trim()) {
+      searchRequestIdRef.current += 1;
+      setSearchStatus("idle");
+      setIntelligenceSession(null);
       return;
     }
 
     if (!hasSpecificNeed) {
+      searchRequestIdRef.current += 1;
+      setSearchStatus("idle");
+      setIntelligenceSession(null);
       return;
     }
+
+    const requestId = searchRequestIdRef.current + 1;
+    searchRequestIdRef.current = requestId;
+    setSearchStatus("pending");
+    setIntelligenceSession(null);
 
     const timer = window.setTimeout(() => {
       void startSearchIntelligenceSession({
@@ -647,6 +661,10 @@ export function MarketplaceExperience() {
         source: "marketplace",
         filters: buildMarketplaceSearchFilters(filters, false)
       }).then((session) => {
+        if (searchRequestIdRef.current !== requestId) {
+          return;
+        }
+
         if (session) {
           setIntelligenceSession(session);
           setAiTagsCleared(false);
@@ -655,6 +673,10 @@ export function MarketplaceExperience() {
             writeAiTagStates(next);
             return next;
           });
+        }
+      }).finally(() => {
+        if (searchRequestIdRef.current === requestId) {
+          setSearchStatus("complete");
         }
       });
     }, 550);
@@ -682,6 +704,10 @@ export function MarketplaceExperience() {
   }, [filters.county, filters.end, filters.start]);
 
   useEffect(() => {
+    if (searchStatus === "pending") {
+      return;
+    }
+
     if (results.length > 0 && !results.some((result) => result.listing.id === selectedId)) {
       const nextListing = results[0]?.listing;
       setSelectedId(nextListing?.id ?? selectedId);
@@ -702,7 +728,7 @@ export function MarketplaceExperience() {
       setBookingQuantity("1");
       setContract(null);
     }
-  }, [popularResults, results, selectedId]);
+  }, [popularResults, results, searchStatus, selectedId]);
 
   useEffect(() => {
     if (requestedListingRef.current !== selectedId) {
@@ -765,6 +791,7 @@ export function MarketplaceExperience() {
   const focusedQuantity = focusedAvailableUnits > 0
     ? Math.min(positiveInteger(bookingQuantity, 1), focusedAvailableUnits)
     : 0;
+  const searchBusy = searchStatus === "pending";
 
   function patchFilters(next: Partial<FilterState>) {
     setFilters((current) => normalizeFilterWindow(current, next));
@@ -1025,11 +1052,12 @@ export function MarketplaceExperience() {
               filters={filters}
               patchFilters={patchFilters}
               aiTags={visibleAiTags}
+              searchBusy={searchBusy}
               onToggleAiTag={toggleAiTag}
               onResetAiTags={resetAiTags}
             />
           ) : null}
-          {mobilePanel === "metrics" ? <MarketplaceSummaryPanel resultsLength={results.length} /> : null}
+          {mobilePanel === "metrics" ? <MarketplaceSummaryPanel resultsLength={results.length} searchBusy={searchBusy} /> : null}
           {mobilePanel === "details" ? (
             <ListingDetailsPanel
               selectedListing={selectedListing}
@@ -1056,17 +1084,20 @@ export function MarketplaceExperience() {
             filters={filters}
             patchFilters={patchFilters}
             aiTags={visibleAiTags}
+            searchBusy={searchBusy}
             onToggleAiTag={toggleAiTag}
             onResetAiTags={resetAiTags}
           />
         </aside>
 
         <section className="grid min-w-0 content-start gap-3 xl:max-h-[calc(100svh-105px)] xl:overflow-y-auto xl:pr-1">
-          <MarketplaceSummaryPanel resultsLength={results.length} className="hidden xl:grid" />
+          <MarketplaceSummaryPanel resultsLength={results.length} searchBusy={searchBusy} className="hidden xl:grid" />
 
           <div className="grid gap-3">
             <div className="rounded-[30px] bg-orbit-panel/35 p-3">
-              {results.length > 0 ? (
+              {searchBusy ? (
+                <SearchProgressState />
+              ) : results.length > 0 ? (
                 <div className="grid gap-x-3 gap-y-3 lg:grid-cols-2 2xl:grid-cols-3">
                   {results.map((result, index) => (
                     <MarketplaceListingCard
@@ -1411,12 +1442,14 @@ function DiscoveryPanel({
   filters,
   patchFilters,
   aiTags,
+  searchBusy,
   onToggleAiTag,
   onResetAiTags
 }: {
   filters: FilterState;
   patchFilters: (next: Partial<FilterState>) => void;
   aiTags: AiTagState[];
+  searchBusy: boolean;
   onToggleAiTag: (tagId: string) => void;
   onResetAiTags: () => void;
 }) {
@@ -1443,7 +1476,11 @@ function DiscoveryPanel({
 
       <label className="mb-3 block">
         <span className="mb-1 block text-xs font-semibold uppercase text-neutral-500">Search</span>
-        <div className={cn(ui.searchShell, "min-h-14 items-start")}>
+        <div
+          className={cn(ui.searchShell, "marketplace-search-shell min-h-14 items-start")}
+          data-searching={searchBusy ? "true" : "false"}
+          aria-busy={searchBusy}
+        >
           <textarea
             ref={queryTextareaRef}
             value={filters.query}
@@ -1562,9 +1599,11 @@ function DiscoveryPanel({
 
 function MarketplaceSummaryPanel({
   resultsLength,
+  searchBusy = false,
   className = "grid"
 }: {
   resultsLength: number;
+  searchBusy?: boolean;
   className?: string;
 }) {
   return (
@@ -1576,7 +1615,7 @@ function MarketplaceSummaryPanel({
         </div>
         <h2 className="mt-2 text-2xl font-black text-orbit-ink">All category availability</h2>
         <p className="mt-1 max-w-3xl text-sm leading-6 text-neutral-600">
-          {resultsLength} matching resources across goods, services, and personnel.
+          {searchBusy ? "Searching matching resources across goods, services, and personnel." : `${resultsLength} matching resources across goods, services, and personnel.`}
         </p>
       </div>
       <div className="grid grid-cols-3 gap-2 text-center text-xs">
@@ -2025,6 +2064,27 @@ function MarketplaceListingCard({
         </button>
       </div>
     </article>
+  );
+}
+
+function SearchProgressState() {
+  return (
+    <div className="grid min-h-[calc(100svh-260px)] place-items-center rounded-[28px] bg-orbit-field/45 px-5 py-14 text-center" role="status" aria-live="polite">
+      <div className="grid place-items-center gap-5">
+        <span className="relative flex h-20 w-20 items-center justify-center rounded-full bg-orbit-panel shadow-[0_16px_34px_rgba(25,32,29,0.1)]">
+          <span className="absolute inset-2 animate-spin rounded-full [background:conic-gradient(from_0deg,#efbf04,#4391f5,#10b981,#8b5cf6,#efbf04)]" />
+          <span className="relative flex h-14 w-14 items-center justify-center rounded-full bg-orbit-panel">
+            <Search className="h-6 w-6 text-[#705d00]" aria-hidden="true" />
+          </span>
+        </span>
+        <div>
+          <h2 className="text-xl font-black text-orbit-ink sm:text-2xl">Searching marketplace</h2>
+          <p className="mt-2 max-w-md text-sm font-semibold leading-6 text-orbit-ink/62">
+            Matching listings to your search and filters.
+          </p>
+        </div>
+      </div>
+    </div>
   );
 }
 
