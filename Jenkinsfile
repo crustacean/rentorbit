@@ -60,16 +60,6 @@ pipeline {
             }
         }
 
-        stage('Seed Listing Intelligence') {
-            steps {
-                script {
-                    withCredentials([string(credentialsId: env.OPENAI_API_KEY_CREDENTIALS, variable: 'OPENAI_API_KEY')]) {
-                        runNodeWithOpenAi('npm run intelligence:seed --workspace @rentorbit/api')
-                    }
-                }
-            }
-        }
-
         stage('Build Images') {
             steps {
                 script {
@@ -196,12 +186,6 @@ def repairWorkspacePermissions() {
 
 def runNode(String command) {
     docker.image(env.NODE_BUILD_IMAGE).inside("-e HOME=${env.WORKSPACE} -e npm_config_cache=${env.WORKSPACE}/.npm-cache") {
-        sh "mkdir -p .npm-cache && ${command}"
-    }
-}
-
-def runNodeWithOpenAi(String command) {
-    docker.image(env.NODE_BUILD_IMAGE).inside("-e HOME=${env.WORKSPACE} -e npm_config_cache=${env.WORKSPACE}/.npm-cache -e OPENAI_API_KEY") {
         sh "mkdir -p .npm-cache && ${command}"
     }
 }
