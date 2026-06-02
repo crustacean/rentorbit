@@ -91,12 +91,7 @@ pipeline {
         stage('Push Images') {
             steps {
                 script {
-                    docker.withRegistry('', env.DOCKER_CREDENTIALS) {
-                        webImage.push()
-                        webImage.push('latest')
-                        apiImage.push()
-                        apiImage.push('latest')
-                    }
+                    pushImagesToRegistry()
                 }
             }
         }
@@ -176,6 +171,7 @@ pipeline {
             sh "docker rmi ${WEB_IMAGE_NAME}:latest || true"
             sh "docker rmi ${API_IMAGE_NAME}:${IMAGE_TAG} || true"
             sh "docker rmi ${API_IMAGE_NAME}:latest || true"
+            sh 'rm -rf .docker-auth'
             sh 'rm -rf prepared-k8s'
         }
     }
@@ -207,6 +203,30 @@ def runNode(String command) {
 def runNodeWithOpenAi(String command) {
     docker.image(env.NODE_BUILD_IMAGE).inside("-e HOME=${env.WORKSPACE} -e npm_config_cache=${env.WORKSPACE}/.npm-cache -e OPENAI_API_KEY") {
         sh "mkdir -p .npm-cache && ${command}"
+    }
+}
+
+def pushImagesToRegistry() {
+    withCredentials([usernamePassword(credentialsId: env.DOCKER_CREDENTIALS, usernameVariable: 'DOCKERHUB_USERNAME', passwordVariable: 'DOCKERHUB_PASSWORD')]) {
+        sh '''
+            set -eu
+            export DOCKER_CONFIG="${WORKSPACE}/.docker-auth"
+            rm -rf "${DOCKER_CONFIG}"
+            mkdir -p "${DOCKER_CONFIG}"
+            cleanup_docker_auth() {
+                docker logout >/dev/null 2>&1 || true
+                rm -rf "${DOCKER_CONFIG}"
+            }
+            trap cleanup_docker_auth EXIT
+
+            printf '%s' "${DOCKERHUB_PASSWORD}" | docker login --username "${DOCKERHUB_USERNAME}" --password-stdin
+            docker tag "${WEB_IMAGE}" "${WEB_IMAGE_NAME}:latest"
+            docker tag "${API_IMAGE}" "${API_IMAGE_NAME}:latest"
+            docker push "${WEB_IMAGE}"
+            docker push "${WEB_IMAGE_NAME}:latest"
+            docker push "${API_IMAGE}"
+            docker push "${API_IMAGE_NAME}:latest"
+        '''
     }
 }
 

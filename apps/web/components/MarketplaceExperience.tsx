@@ -1477,7 +1477,7 @@ function DiscoveryPanel({
       <label className="mb-3 block">
         <span className="mb-1 block text-xs font-semibold uppercase text-neutral-500">Search</span>
         <div
-          className={cn(ui.searchShell, "marketplace-search-shell min-h-14 items-start")}
+          className={cn(ui.searchShell, "marketplace-search-shell min-h-14 items-start rounded-[16px]")}
           data-searching={searchBusy ? "true" : "false"}
           aria-busy={searchBusy}
         >

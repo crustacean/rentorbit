@@ -105,6 +105,7 @@ textarea:focus-visible {
 }
 
 .marketplace-search-shell {
+  border-radius: 16px;
   isolation: isolate;
   position: relative;
 }
