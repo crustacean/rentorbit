@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
 import { startSearchIntelligenceSession } from "@/lib/intelligence";
+import { listingThumbnailUrl } from "@/lib/listingImageUrls";
 import { cn, ui } from "@/lib/ui";
 import { seededListings, type ResourceListing } from "@rentorbit/shared";
 
@@ -133,6 +134,7 @@ export function HomeLanding() {
 
 function FeaturedRentalCard({ listing, priority }: { listing: ResourceListing; priority: boolean }) {
   const media = listing.media[0];
+  const thumbnailUrl = media ? listingThumbnailUrl(media.url, 720, 900) : undefined;
   const price = kes(listing.modeRules[0]?.pricing.rate.amount ?? 0);
 
   return (
@@ -141,13 +143,15 @@ function FeaturedRentalCard({ listing, priority }: { listing: ResourceListing; p
       className="group relative overflow-hidden rounded-[32px] bg-orbit-panel text-left focus-visible:outline-none"
     >
       <div className="relative aspect-[4/5] overflow-hidden">
-        {media ? (
+        {thumbnailUrl ? (
           <img
-            src={media.url}
-            alt={media.alt || listing.title}
+            src={thumbnailUrl}
+            alt={media?.alt || listing.title}
             loading={priority ? "eager" : "lazy"}
             decoding="async"
             fetchPriority={priority ? "high" : undefined}
+            width={720}
+            height={900}
             className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.03]"
           />
         ) : null}

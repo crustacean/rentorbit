@@ -14,6 +14,7 @@ import {
   ZoomOut,
   X
 } from "lucide-react";
+import { ResilientFocusedImage } from "@/components/ResilientFocusedImage";
 import type { Dispatch, SetStateAction } from "react";
 import type { calculateBookingQuote, Coordinates, OperationMode, ResourceListing } from "@rentorbit/shared";
 
@@ -125,6 +126,12 @@ export function FocusedListingOverlay({
   onClose
 }: FocusedListingOverlayProps) {
   const hasMultipleImages = gallery.length > 1;
+  const adjacentImageUrls = hasMultipleImages
+    ? [
+        gallery[(imageIndex + 1) % gallery.length]?.url,
+        gallery[(imageIndex - 1 + gallery.length) % gallery.length]?.url
+      ].filter((url): url is string => Boolean(url))
+    : [];
 
   function shiftImage(direction: "previous" | "next") {
     if (!gallery.length) {
@@ -161,14 +168,11 @@ export function FocusedListingOverlay({
 
           <div className="flex h-full w-full items-center justify-center overflow-hidden rounded-[26px] bg-orbit-field">
             {image ? (
-              <img
+              <ResilientFocusedImage
                 src={image.url}
                 alt={image.alt || listing.title}
-                loading="eager"
-                decoding="async"
-                fetchPriority="high"
-                className="max-h-full max-w-full select-none object-contain transition-transform duration-200 ease-out"
-                style={{ transform: `scale(${zoom})`, transformOrigin: "center center" }}
+                zoom={zoom}
+                preloadUrls={adjacentImageUrls}
               />
             ) : null}
           </div>

@@ -32,6 +32,7 @@ import {
   X
 } from "lucide-react";
 import { CustomSelect, type CustomSelectOption } from "@/components/CustomSelect";
+import { ResilientFocusedImage } from "@/components/ResilientFocusedImage";
 import { SiteHeader } from "@/components/SiteHeader";
 import {
   formatImageBytes,
@@ -1945,6 +1946,12 @@ function AccountFocusedListingOverlay({
   onClose: () => void;
 }) {
   const hasMultipleImages = gallery.length > 1;
+  const adjacentImageUrls = hasMultipleImages
+    ? [
+        gallery[(imageIndex + 1) % gallery.length]?.url,
+        gallery[(imageIndex - 1 + gallery.length) % gallery.length]?.url
+      ].filter((url): url is string => Boolean(url))
+    : [];
 
   function shiftImage(direction: "previous" | "next") {
     if (!gallery.length) {
@@ -1981,14 +1988,11 @@ function AccountFocusedListingOverlay({
 
           <div className="flex h-full w-full items-center justify-center overflow-hidden rounded-[26px] bg-orbit-field">
             {image ? (
-              <img
+              <ResilientFocusedImage
                 src={image.url}
                 alt={image.alt || listing.title}
-                loading="eager"
-                decoding="async"
-                fetchPriority="high"
-                className="max-h-full max-w-full select-none object-contain transition-transform duration-200 ease-out"
-                style={{ transform: `scale(${zoom})`, transformOrigin: "center center" }}
+                zoom={zoom}
+                preloadUrls={adjacentImageUrls}
               />
             ) : null}
           </div>

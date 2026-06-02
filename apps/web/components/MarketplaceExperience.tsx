@@ -31,6 +31,7 @@ import {
   recordSearchIntelligenceConversation,
   startSearchIntelligenceSession
 } from "@/lib/intelligence";
+import { listingThumbnailUrl } from "@/lib/listingImageUrls";
 import { cn, ui } from "@/lib/ui";
 import dynamic from "next/dynamic";
 import Link from "next/link";
@@ -190,28 +191,6 @@ function listingKindLabel(kind: ResourceListing["kind"]) {
 function positiveInteger(value: string | number, fallback = 1): number {
   const parsed = typeof value === "number" ? value : Number.parseInt(value, 10);
   return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback;
-}
-
-function marketplaceThumbnailUrl(url: string, width: number, height: number): string {
-  let parsedUrl: URL;
-
-  try {
-    parsedUrl = new URL(url);
-  } catch {
-    return url;
-  }
-
-  if (!parsedUrl.hostname.includes("images.unsplash.com")) {
-    return url;
-  }
-
-  parsedUrl.searchParams.set("auto", "format");
-  parsedUrl.searchParams.set("fit", "crop");
-  parsedUrl.searchParams.set("w", String(width));
-  parsedUrl.searchParams.set("h", String(height));
-  parsedUrl.searchParams.set("q", "58");
-
-  return parsedUrl.toString();
 }
 
 function bookedUnitsLabel(bookedCount: number, totalCount: number): string {
@@ -1302,7 +1281,7 @@ function EmptyRecommendationCard({
 }) {
   const listing = result.listing;
   const media = listing.media[0];
-  const thumbnailUrl = media ? marketplaceThumbnailUrl(media.url, 640, 400) : undefined;
+  const thumbnailUrl = media ? listingThumbnailUrl(media.url, 640, 400) : undefined;
   const rule = listing.modeRules[0];
   const rate = rule?.pricing.rate.amount ?? 0;
   const metric = rule?.pricing.billingMetric ?? "daily";
@@ -1963,7 +1942,7 @@ function MarketplaceListingCard({
 }) {
   const listing = result.listing;
   const media = listing.media[0];
-  const thumbnailUrl = media ? marketplaceThumbnailUrl(media.url, 640, 360) : undefined;
+  const thumbnailUrl = media ? listingThumbnailUrl(media.url, 640, 360) : undefined;
   const rate = kes(listing.modeRules[0]?.pricing.rate.amount ?? 0);
   const unavailable = result.availabilityState === "unavailable_for_window";
 
