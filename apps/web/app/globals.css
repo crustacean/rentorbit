@@ -110,9 +110,23 @@ textarea:focus-visible {
   position: relative;
 }
 
+@property --orbit-search-border-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
 .marketplace-search-shell::before {
+  --orbit-search-border-angle: 0deg;
   animation: orbit-search-border 1.4s linear infinite;
-  background: conic-gradient(from 0deg, #efbf04, #4391f5, #10b981, #8b5cf6, #efbf04);
+  background: conic-gradient(
+    from var(--orbit-search-border-angle),
+    #efbf04 0deg,
+    #4391f5 90deg,
+    #10b981 180deg,
+    #8b5cf6 270deg,
+    #efbf04 360deg
+  );
   border-radius: inherit;
   content: "";
   inset: 0;
@@ -135,7 +149,7 @@ textarea:focus-visible {
 
 @keyframes orbit-search-border {
   to {
-    transform: rotate(1turn);
+    --orbit-search-border-angle: 360deg;
   }
 }
 
