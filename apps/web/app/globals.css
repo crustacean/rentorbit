@@ -98,6 +98,12 @@ textarea:focus-visible {
   contain: layout paint style;
 }
 
+.marketplace-search-textarea {
+  field-sizing: content;
+  max-block-size: 11rem;
+  overflow-y: auto;
+}
+
 @supports (content-visibility: auto) {
   .defer-below-fold {
     content-visibility: auto;

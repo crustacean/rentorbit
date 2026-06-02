@@ -1050,8 +1050,8 @@ export function MarketplaceExperience() {
         </MobilePanelOverlay>
       ) : null}
 
-      <div className="grid min-h-[calc(100svh-81px)] min-w-0 w-full gap-3 px-3 py-3 xl:h-[calc(100svh-81px)] xl:overflow-hidden xl:grid-cols-[280px_minmax(0,1fr)_360px] 2xl:grid-cols-[300px_minmax(0,1fr)_380px]">
-        <aside className="hidden min-w-0 h-fit self-start xl:sticky xl:top-0 xl:block xl:max-h-full xl:overflow-x-hidden xl:overflow-y-visible">
+      <div className="grid min-h-[calc(100svh-81px)] min-w-0 w-full gap-3 px-3 py-3 xl:grid-cols-[280px_minmax(0,1fr)_360px] 2xl:grid-cols-[300px_minmax(0,1fr)_380px]">
+        <aside className="hidden min-w-0 self-start xl:sticky xl:top-0 xl:block xl:overflow-x-hidden xl:overflow-y-visible">
           <DiscoveryPanel
             filters={filters}
             patchFilters={patchFilters}
@@ -1061,7 +1061,7 @@ export function MarketplaceExperience() {
           />
         </aside>
 
-        <section className="grid min-w-0 content-start gap-3 xl:h-full xl:overflow-y-auto xl:pr-1">
+        <section className="grid min-w-0 content-start gap-3 xl:max-h-[calc(100svh-105px)] xl:overflow-y-auto xl:pr-1">
           <MarketplaceSummaryPanel resultsLength={results.length} className="hidden xl:grid" />
 
           <div className="grid gap-3">
@@ -1098,7 +1098,7 @@ export function MarketplaceExperience() {
           </div>
         </section>
 
-        <aside className="hidden min-w-0 h-fit self-start xl:sticky xl:top-0 xl:block xl:max-h-full xl:overflow-x-hidden xl:overflow-y-visible">
+        <aside className="hidden min-w-0 self-start xl:sticky xl:top-0 xl:block xl:overflow-x-hidden xl:overflow-y-visible">
           <ListingDetailsPanel
             selectedListing={selectedListing}
             selectedPublicCoordinates={selectedPublicCoordinates}
@@ -1420,8 +1420,20 @@ function DiscoveryPanel({
   onToggleAiTag: (tagId: string) => void;
   onResetAiTags: () => void;
 }) {
+  const queryTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  useEffect(() => {
+    const textarea = queryTextareaRef.current;
+    if (!textarea) {
+      return;
+    }
+
+    textarea.style.height = "auto";
+    textarea.style.height = `${Math.min(textarea.scrollHeight, 176)}px`;
+  }, [filters.query]);
+
   return (
-    <section className={cn(ui.surface, "overflow-y-auto overflow-x-hidden p-5")}>
+    <section className={cn(ui.surface, "overflow-x-hidden p-5")}>
       <div className="mb-4 flex items-center justify-between">
         <h2 className="text-base font-bold">Discovery</h2>
         <button className="rounded-full bg-orbit-field p-2 text-orbit-green" title="Filter listings">
@@ -1431,14 +1443,17 @@ function DiscoveryPanel({
 
       <label className="mb-3 block">
         <span className="mb-1 block text-xs font-semibold uppercase text-neutral-500">Search</span>
-        <div className={cn(ui.searchShell, "min-h-14")}>
-          <Search className="ml-2 h-5 w-5 shrink-0 text-orbit-ink/55" aria-hidden="true" />
-          <input
+        <div className={cn(ui.searchShell, "min-h-14 items-start")}>
+          <textarea
+            ref={queryTextareaRef}
             value={filters.query}
             onChange={(event) => patchFilters({ query: event.target.value })}
-            className="min-w-0 flex-1 bg-transparent px-1 text-sm font-semibold text-orbit-ink outline-none placeholder:text-orbit-ink/45 focus:outline-none focus:ring-0 focus-visible:outline-none"
+            rows={1}
+            wrap="soft"
+            className="marketplace-search-textarea min-h-10 min-w-0 flex-1 resize-none bg-transparent px-2 py-2 text-sm font-semibold leading-5 text-orbit-ink outline-none placeholder:text-orbit-ink/45 focus:outline-none focus:ring-0 focus-visible:outline-none"
             style={{ outline: "none" }}
             placeholder="camera, crew, generator"
+            aria-label="Search marketplace"
           />
         </div>
       </label>
