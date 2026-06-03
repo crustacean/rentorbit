@@ -1069,7 +1069,7 @@ export function AccountDashboard({ email, onSignOut }: AccountDashboardProps) {
       ) : null}
 
       <div className="grid min-h-[calc(100svh-81px)] min-w-0 w-full gap-3 px-3 py-3 xl:h-[calc(100svh-81px)] xl:grid-cols-[300px_minmax(0,1fr)_390px] xl:overflow-hidden 2xl:grid-cols-[320px_minmax(0,1fr)_400px]">
-        <aside className="hidden min-w-0 h-fit self-start xl:sticky xl:top-0 xl:block xl:max-h-full xl:overflow-x-hidden xl:overflow-y-visible">
+        <aside className="viewport-scroll-aside hidden min-w-0 h-fit self-start xl:sticky xl:top-0 xl:block">
           {createListingPanel}
         </aside>
 
@@ -1094,7 +1094,7 @@ export function AccountDashboard({ email, onSignOut }: AccountDashboardProps) {
           />
         </section>
 
-        <aside className="hidden min-w-0 h-fit self-start xl:sticky xl:top-0 xl:block xl:max-h-full xl:overflow-x-hidden xl:overflow-y-visible">
+        <aside className="viewport-scroll-aside hidden min-w-0 h-fit self-start xl:sticky xl:top-0 xl:block">
           {sidePanel}
         </aside>
       </div>

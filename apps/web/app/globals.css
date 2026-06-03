@@ -139,6 +139,14 @@ textarea:focus-visible {
   inline-size: clamp(0.875rem, 3.6vw, 1rem);
 }
 
+.viewport-scroll-aside {
+  max-block-size: calc(100svh - 105px);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
 .focused-view-close-button {
   block-size: clamp(2.75rem, 11vw, 4rem);
   inline-size: clamp(2.75rem, 11vw, 4rem);

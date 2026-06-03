@@ -1076,7 +1076,7 @@ export function MarketplaceExperience() {
       ) : null}
 
       <div className="grid min-h-[calc(100svh-81px)] min-w-0 w-full gap-3 px-3 py-3 xl:grid-cols-[280px_minmax(0,1fr)_360px] 2xl:grid-cols-[300px_minmax(0,1fr)_380px]">
-        <aside className="hidden min-w-0 self-start xl:sticky xl:top-0 xl:block xl:overflow-x-hidden xl:overflow-y-visible">
+        <aside className="viewport-scroll-aside hidden min-w-0 self-start xl:sticky xl:top-0 xl:block">
           <DiscoveryPanel
             filters={filters}
             patchFilters={patchFilters}
@@ -1126,7 +1126,7 @@ export function MarketplaceExperience() {
           </div>
         </section>
 
-        <aside className="hidden min-w-0 self-start xl:sticky xl:top-0 xl:block xl:overflow-x-hidden xl:overflow-y-visible">
+        <aside className="viewport-scroll-aside hidden min-w-0 self-start xl:sticky xl:top-0 xl:block">
           <ListingDetailsPanel
             selectedListing={selectedListing}
             selectedPublicCoordinates={selectedPublicCoordinates}
