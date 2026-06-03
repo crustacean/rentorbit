@@ -505,34 +505,66 @@ textarea:focus-visible {
   color: #e0e0e0;
 }
 
+.kind-tag,
+.availability-tag {
+  --tag-rgb: 126 119 95;
+  align-items: center;
+  background-color: rgb(var(--tag-rgb) / 0.2);
+  block-size: clamp(1.5rem, 1.8vw, 1.6875rem);
+  border: 1px solid rgb(var(--tag-rgb));
+  color: rgb(var(--tag-rgb));
+  display: inline-flex;
+  font-size: clamp(0.42rem, 0.54vw, 0.47rem);
+  font-weight: 900;
+  gap: clamp(0.25rem, 0.6vw, 0.375rem);
+  justify-content: center;
+  line-height: 1;
+  min-block-size: 0;
+  padding-block: 0;
+  padding-inline: clamp(0.42rem, 0.675vw, 0.52rem);
+  white-space: nowrap;
+}
+
 .kind-tag[data-kind="good"] {
-  background-color: #3b82f6;
-  border-color: #3b82f6;
-  color: #ffffff;
+  --tag-rgb: 59 130 246;
 }
 
 .kind-tag[data-kind="service"] {
-  background-color: #10b981;
-  border-color: #10b981;
-  color: #ffffff;
+  --tag-rgb: 16 185 129;
 }
 
 .kind-tag[data-kind="personnel"] {
-  background-color: #8b5cf6;
-  border-color: #8b5cf6;
-  color: #ffffff;
+  --tag-rgb: 139 92 246;
 }
 
-.kind-tag svg {
+.availability-tag[data-status="available"] {
+  --tag-rgb: 16 185 129;
+}
+
+.availability-tag[data-status="booked"] {
+  --tag-rgb: 186 26 26;
+}
+
+.availability-tag[data-status="pending"] {
+  --tag-rgb: 233 196 0;
+}
+
+.availability-tag[data-status="neutral"] {
+  --tag-rgb: 126 119 95;
+}
+
+:root[data-theme="dark"] .kind-tag,
+:root[data-theme="dark"] .availability-tag {
+  background-color: rgb(var(--tag-rgb) / 0.2);
+  border-color: rgb(var(--tag-rgb));
+  color: rgb(var(--tag-rgb));
+}
+
+.kind-tag svg,
+.availability-tag svg {
+  block-size: clamp(0.7rem, 1vw, 0.8rem);
   color: currentColor;
-}
-
-:root[data-theme="dark"] .kind-tag[data-kind] {
-  color: #ffffff;
-}
-
-:root[data-theme="dark"] .kind-tag[data-kind] svg {
-  color: currentColor;
+  inline-size: clamp(0.7rem, 1vw, 0.8rem);
 }
 
 :root[data-theme="dark"] .image-overlay-element,

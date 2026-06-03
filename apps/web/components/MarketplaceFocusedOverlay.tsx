@@ -424,10 +424,10 @@ function BookingDetailsContent({
         <div className="flex flex-wrap items-center gap-2 text-[10px] font-black uppercase tracking-[0.04em]">
           <span className="orbit-tag rounded-full bg-orbit-soft px-[15px] py-[7px]">{listing.location.county}</span>
           <span className="orbit-tag rounded-full bg-orbit-soft px-[15px] py-[7px]">{listing.category}</span>
-          <span className="kind-tag orbit-tag rounded-full px-[15px] py-[7px]" data-kind={listing.kind}>
+          <span className="kind-tag orbit-tag rounded-full" data-kind={listing.kind}>
             {listingKindLabel(listing.kind)}
           </span>
-          <span className="orbit-tag ml-auto inline-flex min-h-9 shrink-0 items-center justify-center whitespace-nowrap rounded-full bg-orbit-soft px-[15px] py-[7px] text-orbit-ink">
+          <span className="availability-tag orbit-tag ml-auto shrink-0 rounded-full" data-status={bookedUnits > 0 ? "booked" : "available"}>
             {bookedUnitsLabel(bookedUnits, totalUnits)}
           </span>
         </div>

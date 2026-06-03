@@ -1327,7 +1327,7 @@ function EmptyRecommendationCard({
             <Star className="h-3.5 w-3.5 fill-[#EFBF04] text-[#EFBF04]" aria-hidden="true" />
             {listing.rating.toFixed(1)}
           </span>
-          <span className="kind-tag absolute right-3 top-3 rounded-full px-[9px] py-[3px] text-[10px] font-black uppercase tracking-[0.08em]" data-kind={listing.kind}>
+          <span className="kind-tag absolute right-3 top-3 rounded-full uppercase tracking-[0.08em]" data-kind={listing.kind}>
             {listingKindLabel(listing.kind)}
           </span>
         </div>
@@ -1723,10 +1723,10 @@ function BookingDetailsContent({
         <div className="flex flex-wrap items-center gap-2 text-[10px] font-black uppercase tracking-[0.04em]">
           <span className="orbit-tag rounded-full bg-orbit-soft px-[15px] py-[7px]">{listing.location.county}</span>
           <span className="orbit-tag rounded-full bg-orbit-soft px-[15px] py-[7px]">{listing.category}</span>
-          <span className="kind-tag orbit-tag rounded-full px-[15px] py-[7px]" data-kind={listing.kind}>
+          <span className="kind-tag orbit-tag rounded-full" data-kind={listing.kind}>
             {listingKindLabel(listing.kind)}
           </span>
-          <span className="orbit-tag ml-auto inline-flex min-h-9 shrink-0 items-center justify-center whitespace-nowrap rounded-full bg-orbit-soft px-[15px] py-[7px] text-orbit-ink">
+          <span className="availability-tag orbit-tag ml-auto shrink-0 rounded-full" data-status={bookedUnits > 0 ? "booked" : "available"}>
             {bookedUnitsLabel(bookedUnits, totalUnits)}
           </span>
         </div>
@@ -1996,16 +1996,16 @@ function MarketplaceListingCard({
         <div>
           <div className="mb-4 flex flex-wrap items-center gap-2">
             <span
-              className="kind-tag orbit-tag inline-flex h-[clamp(32px,2.4vw,36px)] items-center gap-2 rounded-full border px-[clamp(9px,0.9vw,11px)] text-[clamp(9px,0.72vw,10px)] font-black uppercase tracking-normal"
+              className="kind-tag orbit-tag rounded-full uppercase tracking-normal"
               data-kind={listing.kind}
             >
               {listingIcon(listing.kind)}
               {listingKindLabel(listing.kind)}
             </span>
             {unavailable ? (
-              <span className="orbit-tag inline-flex h-[clamp(32px,2.4vw,36px)] items-center rounded-full bg-orbit-clay px-[clamp(9px,0.9vw,11px)] text-[clamp(9px,0.72vw,10px)] font-black uppercase text-orbit-field">Booked</span>
+              <span className="availability-tag orbit-tag rounded-full uppercase" data-status="booked">Booked</span>
             ) : (
-              <span className="orbit-tag inline-flex h-[clamp(32px,2.4vw,36px)] items-center rounded-full bg-orbit-soft/85 px-[clamp(9px,0.9vw,11px)] text-[clamp(9px,0.72vw,10px)] font-black uppercase text-orbit-ink">
+              <span className="availability-tag orbit-tag rounded-full uppercase" data-status="available">
                 Available
               </span>
             )}

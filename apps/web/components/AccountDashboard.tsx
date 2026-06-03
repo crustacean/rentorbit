@@ -278,6 +278,14 @@ function bookedUnitsLabel(bookedCount: number, totalCount: number): string {
   return `${booked}:${total} BOOKED`;
 }
 
+function statusTagTone(status: string): "available" | "booked" | "pending" | "neutral" {
+  const normalized = status.toLowerCase();
+  if (normalized.includes("available")) return "available";
+  if (normalized.includes("booked") || normalized.includes("active") || normalized.includes("progress") || normalized.includes("return")) return "booked";
+  if (normalized.includes("pending") || normalized.includes("inquiry") || normalized.includes("quote") || normalized.includes("signature") || normalized.includes("saved")) return "pending";
+  return "neutral";
+}
+
 function positiveInteger(value: string | number, fallback = 1): number {
   const parsed = typeof value === "number" ? value : Number.parseInt(value, 10);
   return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback;
@@ -1836,7 +1844,7 @@ function ActivityCard({
           <p className="mt-1 line-clamp-2 text-xs font-semibold leading-5 text-orbit-ink/60">{item.description}</p>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-2">
-          <span className="orbit-tag rounded-full bg-orbit-soft px-[11px] py-[7px] text-[10px] font-black uppercase">
+          <span className="availability-tag orbit-tag rounded-full uppercase" data-status={statusTagTone(item.status)}>
             {item.status}
           </span>
         </div>
@@ -1847,7 +1855,7 @@ function ActivityCard({
             const detailKind = kindFromTagText(detail);
 
             return detailKind ? (
-              <span key={`${item.id}-${detail}-${index}`} className="kind-tag orbit-tag rounded-full px-[11px] py-[7px]" data-kind={detailKind}>
+              <span key={`${item.id}-${detail}-${index}`} className="kind-tag orbit-tag rounded-full" data-kind={detailKind}>
                 {listingKindLabel(detailKind)}
               </span>
             ) : (
@@ -2133,11 +2141,11 @@ function AccountFocusedDetailsPanel({
           <div className="flex flex-wrap items-center gap-2 text-[10px] font-black uppercase tracking-[0.04em]">
             <span className="orbit-tag rounded-full bg-orbit-soft px-[15px] py-[7px]">{listing.location.county}</span>
             <span className="orbit-tag rounded-full bg-orbit-soft px-[15px] py-[7px]">{listing.category}</span>
-            <span className="kind-tag orbit-tag rounded-full px-[15px] py-[7px]" data-kind={listing.kind}>
+            <span className="kind-tag orbit-tag rounded-full" data-kind={listing.kind}>
               {listingKindLabel(listing.kind)}
             </span>
             <span className="orbit-tag rounded-full bg-orbit-soft px-[15px] py-[7px]">{mobilityLabel(listingMobility(listing))}</span>
-            <span className="orbit-tag ml-auto inline-flex min-h-9 shrink-0 items-center justify-center whitespace-nowrap rounded-full bg-orbit-soft px-[15px] py-[7px] text-orbit-ink">
+            <span className="availability-tag orbit-tag ml-auto shrink-0 rounded-full" data-status={bookedUnits > 0 ? "booked" : "available"}>
               {bookedUnitsLabel(bookedUnits, totalUnits)}
             </span>
           </div>
