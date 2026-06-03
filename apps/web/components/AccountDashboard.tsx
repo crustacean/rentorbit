@@ -1826,7 +1826,7 @@ function ActivityCard({
         }
       }}
       aria-pressed={selected}
-      className={`cursor-pointer rounded-[24px] border-2 bg-orbit-panel p-4 text-left transition-colors focus-visible:border-[#4391F5] focus-visible:outline-none ${
+      className={`listing-card-shell cursor-pointer rounded-[24px] border-2 bg-orbit-panel p-4 text-left transition-colors focus-visible:border-[#4391F5] focus-visible:outline-none ${
         selected ? "border-[#4391F5]" : "border-orbit-field"
       }`}
     >
@@ -1873,7 +1873,7 @@ function ActivityCard({
               }
               onSelect();
             }}
-            className="image-overlay-element image-overlay-surface z-10 inline-flex h-12 min-w-[108px] shrink-0 items-center justify-between gap-3 rounded-full bg-[#c8bfb1]/90 p-[3px] pl-5 text-sm font-semibold text-orbit-ink shadow-[0_8px_22px_rgba(25,32,29,0.12)] backdrop-blur-md"
+            className="listing-card-action-pill image-overlay-element image-overlay-surface z-10 inline-flex shrink-0 items-center justify-between gap-3 rounded-full bg-[#c8bfb1]/90 font-semibold text-orbit-ink shadow-[0_8px_22px_rgba(25,32,29,0.12)] backdrop-blur-md"
           >
             {item.actionLabel}
             <span className="image-overlay-element image-overlay-strong flex h-full aspect-square items-center justify-center rounded-full bg-black text-white">

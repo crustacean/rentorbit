@@ -42,7 +42,7 @@ export function ThemeSwitcher({ compact: _compact = false }: { compact?: boolean
     <button
       type="button"
       onClick={toggleMode}
-      className={cn(ui.iconButton, "h-11 w-11 border border-orbit-line bg-orbit-panel/90 p-[3px] shadow-panel backdrop-blur")}
+      className={cn(ui.iconButton, "h-10 w-10 border border-orbit-line bg-orbit-panel/90 p-[3px] shadow-panel backdrop-blur sm:h-11 sm:w-11")}
       aria-label={`Switch to ${nextLabel} mode`}
       title={`${activeMode.label} mode`}
     >

@@ -492,6 +492,7 @@ export function MarketplaceExperience() {
   const [aiTagsCleared, setAiTagsCleared] = useState(false);
   const [searchStatus, setSearchStatus] = useState<SearchStatus>("idle");
   const searchRequestIdRef = useRef(0);
+  const closeDiscoveryAfterSearchRef = useRef(false);
 
   useEffect(registerServiceWorker, []);
 
@@ -663,6 +664,15 @@ export function MarketplaceExperience() {
     return () => window.clearTimeout(timer);
   }, [aiTagsCleared, filters]);
 
+  useEffect(() => {
+    if (searchStatus !== "complete" || !closeDiscoveryAfterSearchRef.current) {
+      return;
+    }
+
+    closeDiscoveryAfterSearchRef.current = false;
+    setMobilePanel((current) => (current === "discovery" ? null : current));
+  }, [searchStatus]);
+
   const popularResults = useMemo(() => {
     const activeListings = seededListings
       .filter((listing) => listing.status === "active" && listing.media.length > 0)
@@ -773,6 +783,10 @@ export function MarketplaceExperience() {
   const searchBusy = searchStatus === "pending";
 
   function patchFilters(next: Partial<FilterState>) {
+    if (mobilePanel === "discovery" && typeof next.query === "string" && next.query.trim()) {
+      closeDiscoveryAfterSearchRef.current = true;
+    }
+
     setFilters((current) => normalizeFilterWindow(current, next));
   }
 
@@ -1034,6 +1048,10 @@ export function MarketplaceExperience() {
               searchBusy={searchBusy}
               onToggleAiTag={toggleAiTag}
               onResetAiTags={resetAiTags}
+              onSearchSubmit={() => {
+                closeDiscoveryAfterSearchRef.current = false;
+                setMobilePanel(null);
+              }}
             />
           ) : null}
           {mobilePanel === "metrics" ? <MarketplaceSummaryPanel resultsLength={results.length} searchBusy={searchBusy} /> : null}
@@ -1423,7 +1441,8 @@ function DiscoveryPanel({
   aiTags,
   searchBusy,
   onToggleAiTag,
-  onResetAiTags
+  onResetAiTags,
+  onSearchSubmit
 }: {
   filters: FilterState;
   patchFilters: (next: Partial<FilterState>) => void;
@@ -1431,6 +1450,7 @@ function DiscoveryPanel({
   searchBusy: boolean;
   onToggleAiTag: (tagId: string) => void;
   onResetAiTags: () => void;
+  onSearchSubmit?: () => void;
 }) {
   const queryTextareaRef = useRef<HTMLTextAreaElement | null>(null);
 
@@ -1464,8 +1484,15 @@ function DiscoveryPanel({
             ref={queryTextareaRef}
             value={filters.query}
             onChange={(event) => patchFilters({ query: event.target.value })}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && !event.shiftKey) {
+                event.preventDefault();
+                onSearchSubmit?.();
+              }
+            }}
             rows={1}
             wrap="soft"
+            enterKeyHint="search"
             className="marketplace-search-textarea min-h-10 min-w-0 flex-1 resize-none bg-transparent px-2 py-2 text-sm font-semibold leading-5 text-orbit-ink outline-none placeholder:text-orbit-ink/45 focus:outline-none focus:ring-0 focus-visible:outline-none"
             style={{ outline: "none" }}
             placeholder="camera, crew, generator"
@@ -1961,7 +1988,7 @@ function MarketplaceListingCard({
       data-selected={selected ? "true" : "false"}
       data-listing-id={listing.id}
       className={cn(
-        "grid min-h-[240px] cursor-pointer overflow-hidden rounded-[30px] border-2 border-transparent bg-orbit-panel p-4 text-left shadow-[0_2px_14px_rgba(25,32,29,0.12)] transition-shadow data-[selected=true]:border-orbit-green hover:shadow-[0_2px_14px_rgba(25,32,29,0.18)] focus-visible:border-orbit-green focus-visible:outline-none focus-visible:shadow-[0_2px_14px_rgba(25,32,29,0.12)] md:min-h-[clamp(220px,16vw,270px)] md:grid-cols-[minmax(0,1fr)_40%]",
+        "listing-card-shell grid min-h-[240px] w-full max-w-full min-w-0 cursor-pointer overflow-hidden rounded-[30px] border-2 border-transparent bg-orbit-panel p-4 text-left shadow-[0_2px_14px_rgba(25,32,29,0.12)] transition-shadow data-[selected=true]:border-orbit-green hover:shadow-[0_2px_14px_rgba(25,32,29,0.18)] focus-visible:border-orbit-green focus-visible:outline-none focus-visible:shadow-[0_2px_14px_rgba(25,32,29,0.12)] md:min-h-[clamp(220px,16vw,270px)] md:grid-cols-[minmax(0,1fr)_40%]",
         deferRendering ? "defer-below-fold" : null
       )}
     >
@@ -1994,7 +2021,7 @@ function MarketplaceListingCard({
         </div>
       </div>
 
-      <div className="relative isolate mt-4 aspect-[16/9] min-h-[170px] self-stretch overflow-hidden rounded-[26px] bg-orbit-soft md:mt-0 md:h-full md:min-h-[clamp(180px,14vw,240px)] md:aspect-auto">
+      <div className="listing-card-media relative isolate mt-4 aspect-[16/9] min-h-[150px] self-stretch overflow-hidden rounded-[26px] bg-orbit-soft md:mt-0 md:h-full md:min-h-[clamp(180px,14vw,240px)] md:aspect-auto">
         {thumbnailUrl ? (
           <img
             src={thumbnailUrl}
@@ -2034,7 +2061,7 @@ function MarketplaceListingCard({
             onOpen();
           }}
           onKeyDown={(event) => event.stopPropagation()}
-          className="image-overlay-element image-overlay-surface absolute bottom-[clamp(6px,2vw,8px)] right-[clamp(6px,2vw,8px)] z-10 inline-flex h-[clamp(32px,9vw,35px)] items-center gap-1 rounded-full bg-[#c8bfb1]/90 p-[2px] pl-[clamp(10px,3vw,12px)] text-[clamp(10px,3vw,11px)] font-semibold text-orbit-ink backdrop-blur-md"
+          className="listing-card-action-pill image-overlay-element image-overlay-surface absolute bottom-[clamp(6px,2vw,8px)] right-[clamp(6px,2vw,8px)] z-10 inline-flex items-center gap-1 rounded-full bg-[#c8bfb1]/90 font-semibold text-orbit-ink backdrop-blur-md"
         >
           Open
           <span className="image-overlay-element image-overlay-strong flex h-full aspect-square items-center justify-center rounded-full bg-black text-white">
