@@ -22,7 +22,6 @@ const popularSearches = [
   { label: "Bikes", href: "/marketplace?search=bikes" }
 ];
 const listItemHref = "/account?mode=signup&returnTo=%2F";
-const footerAccountHref = "/account?mode=signin&returnTo=%2F";
 
 function kes(amount: number): string {
   return new Intl.NumberFormat("en-KE", {
@@ -51,16 +50,16 @@ export function HomeLanding() {
       <SiteHeader active="home" />
 
       <section className="mx-auto flex w-full max-w-7xl flex-col items-center px-5 pb-20 pt-16 text-center sm:px-8 lg:px-16">
-        <h1 className="max-w-3xl text-4xl font-black leading-tight text-orbit-ink sm:text-5xl md:text-6xl">
+        <h1 className="max-w-3xl text-[clamp(2rem,5vw,3rem)] font-bold leading-[1.16] tracking-[-0.02em] text-orbit-ink">
           Access Everything. Own Less.
         </h1>
 
-        <p className="mt-5 max-w-2xl text-base font-semibold leading-7 text-orbit-ink/68 sm:text-lg">
+        <p className="mt-5 max-w-2xl text-base font-normal leading-7 text-orbit-ink/68 sm:text-lg">
           Rent trusted goods, book verified services, and find personnel across Kenya without buying what you only need for a moment.
         </p>
 
         <form onSubmit={handleSearch} className="mt-10 w-full max-w-2xl" role="search">
-          <div className={cn(ui.searchShell, "min-h-[68px]")}>
+          <div className={cn(ui.searchShell, "min-h-[68px] rounded-full")}>
             <Search className="ml-3 h-6 w-6 shrink-0 text-orbit-ink/55" aria-hidden="true" />
             <input
               value={searchTerm}
@@ -82,7 +81,7 @@ export function HomeLanding() {
               <Link
                 key={item.label}
                 href={item.href}
-                className={cn(ui.panelPill, "theme-body-border shrink-0 border border-orbit-line/70 bg-orbit-panel/45 px-4 py-2 text-xs text-orbit-ink/66 hover:bg-orbit-panel hover:text-orbit-green")}
+                className={cn(ui.panelPill, "theme-body-border shrink-0 px-4 py-2 text-xs text-orbit-ink/66 hover:bg-orbit-panel hover:text-orbit-green")}
               >
                 {item.label}
               </Link>
@@ -94,8 +93,8 @@ export function HomeLanding() {
       <section className="mx-auto w-full max-w-7xl px-5 pb-20 sm:px-8 lg:px-16">
         <div className="mb-10 flex items-end justify-between gap-4">
           <div>
-            <h2 className="text-2xl font-black text-orbit-ink sm:text-3xl">Featured Rentals</h2>
-            <p className="mt-1 text-sm font-semibold text-orbit-ink/62 sm:text-base">High-quality equipment curated for you.</p>
+            <h2 className="text-2xl font-semibold tracking-[-0.01em] text-orbit-ink sm:text-3xl">Featured Rentals</h2>
+            <p className="mt-1 text-sm font-normal text-orbit-ink/62 sm:text-base">High-quality equipment curated for you.</p>
           </div>
           <Link href="/marketplace" className="hidden items-center gap-2 text-sm font-black text-orbit-green hover:underline sm:inline-flex">
             View all
@@ -111,15 +110,15 @@ export function HomeLanding() {
       </section>
 
       <section className="mx-auto w-full max-w-7xl px-5 pb-20 sm:px-8 lg:px-16">
-        <div className="relative overflow-hidden rounded-[40px] bg-[#EFBF04] px-6 py-12 text-center text-[#1a1a1a] sm:px-12 md:py-20">
+        <div className="relative overflow-hidden rounded-[32px] bg-[#ffd700] px-6 py-12 text-center text-[#1a1a1a] sm:px-12 md:py-20">
           <div className="relative z-10 mx-auto max-w-2xl">
-            <h2 className="text-3xl font-black leading-tight sm:text-4xl">Have items gathering dust?</h2>
-            <p className="mx-auto mt-5 max-w-xl text-base font-semibold leading-7 text-[#1a1a1a]/75 sm:text-lg">
+            <h2 className="text-3xl font-semibold leading-tight tracking-[-0.01em] sm:text-4xl">Have items gathering dust?</h2>
+            <p className="mx-auto mt-5 max-w-xl text-base font-normal leading-7 text-[#1a1a1a]/75 sm:text-lg">
               Join RentOrbit and start earning from tools, spaces, vehicles, equipment, and services people already need.
             </p>
             <Link
               href={listItemHref}
-              className="mt-8 inline-flex min-h-14 items-center justify-center rounded-full bg-[#403301] px-8 text-sm font-black text-white transition-colors hover:bg-[#2f2601] focus-visible:outline-none"
+              className="mt-8 inline-flex min-h-14 items-center justify-center rounded-full bg-[#705d00] px-8 text-sm font-black text-white transition-colors hover:bg-[#544600] focus-visible:outline-none"
             >
               List Your Item Now
             </Link>
@@ -142,7 +141,7 @@ function FeaturedRentalCard({ listing, priority }: { listing: ResourceListing; p
       href={`/marketplace?listing=${encodeURIComponent(listing.id)}`}
       className="group relative overflow-hidden rounded-[32px] bg-orbit-panel text-left focus-visible:outline-none"
     >
-      <div className="relative aspect-[4/5] overflow-hidden">
+      <div className="relative aspect-[4/5] overflow-hidden rounded-[32px] ring-1 ring-orbit-line/35">
         {thumbnailUrl ? (
           <img
             src={thumbnailUrl}
@@ -157,13 +156,13 @@ function FeaturedRentalCard({ listing, priority }: { listing: ResourceListing; p
         ) : null}
         <div className="absolute inset-x-0 bottom-0 p-4">
           <div className="featured-rental-glass relative rounded-[24px] p-5 backdrop-blur-xl">
-            <div className="featured-rental-rating absolute right-5 top-5 rounded-full px-3 py-1 text-xs font-black">
+            <div className="featured-rental-rating absolute right-5 top-5 rounded-full px-3 py-1 text-xs font-semibold">
               {listing.rating.toFixed(1)}
             </div>
             <div className="space-y-1 pr-16">
               <span className="block text-2xl font-black">{price.replace("KES", "").trim()}</span>
-              <h3 className="truncate text-lg font-black">{listing.title}</h3>
-              <p className="truncate text-sm font-semibold opacity-75">
+              <h3 className="truncate text-lg font-semibold">{listing.title}</h3>
+              <p className="truncate text-sm font-medium opacity-75">
                 {listing.location.generalArea}, {listing.location.county}
               </p>
             </div>
@@ -176,12 +175,10 @@ function FeaturedRentalCard({ listing, priority }: { listing: ResourceListing; p
 
 function HomeFooter() {
   return (
-    <footer className="home-footer-divider border-t border-[#403301] bg-orbit-field px-5 py-12 sm:px-8 lg:px-16">
-      <nav className="mx-auto flex w-full max-w-7xl flex-col items-center justify-center gap-5 text-sm font-black text-orbit-ink/62 sm:flex-row" aria-label="Footer">
-        <Link href="/" className="hover:text-orbit-green">Home</Link>
-        <Link href="/marketplace" className="hover:text-orbit-green">Marketplace</Link>
-        <Link href={listItemHref} className="hover:text-orbit-green">List Your Item</Link>
-        <Link href={footerAccountHref} className="hover:text-orbit-green">Account</Link>
+    <footer className="home-footer-divider border-t bg-orbit-field px-5 py-12 sm:px-8 lg:px-16">
+      <nav className="mx-auto flex w-full max-w-7xl flex-col items-center justify-center gap-5 text-sm font-semibold text-orbit-ink/62 sm:flex-row" aria-label="Footer">
+        <Link href="/terms" className="hover:text-orbit-green">Terms</Link>
+        <Link href="/privacy" className="hover:text-orbit-green">Privacy</Link>
         <a href="mailto:hello@rentorbit.co.ke" className="hover:text-orbit-green">Contact</a>
       </nav>
     </footer>

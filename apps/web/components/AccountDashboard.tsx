@@ -1069,11 +1069,11 @@ export function AccountDashboard({ email, onSignOut }: AccountDashboardProps) {
       ) : null}
 
       <div className="grid min-h-[calc(100svh-81px)] min-w-0 w-full gap-3 px-3 py-3 xl:h-[calc(100svh-81px)] xl:grid-cols-[300px_minmax(0,1fr)_390px] xl:overflow-hidden 2xl:grid-cols-[320px_minmax(0,1fr)_400px]">
-        <aside className="viewport-scroll-aside hidden min-w-0 h-fit self-start xl:sticky xl:top-0 xl:block">
+        <aside className="viewport-scroll-column hidden min-w-0 h-fit self-start xl:sticky xl:top-0 xl:block">
           {createListingPanel}
         </aside>
 
-        <section className="grid min-w-0 content-start gap-3 xl:h-full xl:overflow-y-auto xl:pr-1">
+        <section className="viewport-scroll-column grid min-w-0 content-start gap-3 xl:pr-1">
           <AccountMetricsPanel
             activeActivity={activeActivity}
             activeRentalsCount={activeRentalsCount}
@@ -1094,7 +1094,7 @@ export function AccountDashboard({ email, onSignOut }: AccountDashboardProps) {
           />
         </section>
 
-        <aside className="viewport-scroll-aside hidden min-w-0 h-fit self-start xl:sticky xl:top-0 xl:block">
+        <aside className="viewport-scroll-column hidden min-w-0 h-fit self-start xl:sticky xl:top-0 xl:block">
           {sidePanel}
         </aside>
       </div>

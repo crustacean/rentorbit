@@ -79,7 +79,7 @@ export function SiteHeader({ active = "home", sessionEmail, onSignOut }: SiteHea
 
   return (
     <>
-      <header className="theme-body-border sticky top-0 z-50 border-b border-white/70 bg-orbit-panel/82 backdrop-blur-xl">
+      <header className="theme-body-border sticky top-0 z-50 border-b border-orbit-line/35 bg-orbit-field/78 backdrop-blur-xl">
         <div className="site-header-inner mx-auto flex w-full max-w-7xl items-center justify-between">
           <div className="flex min-w-0 items-center gap-3 sm:gap-8">
             <Link href="/" className="site-header-logo min-w-0 shrink font-black leading-none text-orbit-green" aria-label="RentOrbit home">
