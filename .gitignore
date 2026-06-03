@@ -21,3 +21,5 @@ CHANGELOG.MD
 logs
 .agents
 skills-lock.json
+Agent.md
+Skill.md

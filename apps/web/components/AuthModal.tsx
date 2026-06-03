@@ -48,8 +48,8 @@ const accountsKey = "rentorbit:accounts";
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 const idTypes: IdType[] = ["National ID", "Passport number", "Alien ID"];
 const idTypeOptions: CustomSelectOption[] = idTypes.map((option) => ({ value: option, label: option }));
-const modalFieldClass = "auth-modal-field min-h-12 w-full px-3 py-3";
-const modalLabelClass = ui.label;
+const modalFieldClass = "auth-modal-field min-h-12 w-full px-3.5 py-3";
+const modalLabelClass = "auth-modal-label";
 const modalActionClass = cn(ui.goldPill, "min-h-[52px] w-full rounded-[14px] px-5 text-sm shadow-[0_14px_34px_rgba(239,191,4,0.18)] active:scale-[0.98]");
 
 let accountWorkspacePreload: Promise<unknown> | null = null;
@@ -391,7 +391,7 @@ export function AuthModal({ open, initialMode = "signin", onClose, onAuthenticat
             {mode === "signup" && signupStage === "credentials" ? (
               <p className="text-xs font-black uppercase tracking-[0.16em] text-[#EFBF04]">Identity verified</p>
             ) : (
-              <button type="button" onClick={() => switchMode(mode === "signin" ? "signup" : "signin")} className="inline-flex items-center gap-2 text-xs font-semibold text-orbit-ink/62 hover:text-orbit-ink">
+              <button type="button" onClick={() => switchMode(mode === "signin" ? "signup" : "signin")} className="inline-flex items-center gap-2 text-xs font-bold text-orbit-ink/68 hover:text-orbit-ink">
                 <ArrowLeft className="h-4 w-4" aria-hidden="true" />
                 {mode === "signin" ? "Sign Up" : "Sign In"}
               </button>
@@ -399,7 +399,7 @@ export function AuthModal({ open, initialMode = "signin", onClose, onAuthenticat
           </div>
 
           <div className="flex items-center">
-            <button type="button" onClick={onClose} className="flex h-9 w-9 items-center justify-center rounded-full text-orbit-ink/55 hover:bg-orbit-field/70 focus-visible:outline-none" aria-label="Close account dialog">
+            <button type="button" onClick={onClose} className="flex h-9 w-9 items-center justify-center rounded-full text-orbit-ink/64 hover:bg-orbit-field/70 focus-visible:outline-none" aria-label="Close account dialog">
               <X className="h-4 w-4" aria-hidden="true" />
             </button>
           </div>
@@ -464,7 +464,7 @@ export function AuthModal({ open, initialMode = "signin", onClose, onAuthenticat
               <span className={`h-1.5 rounded-full transition-all ${signupStage === "credentials" ? "w-7 bg-[#EFBF04]" : "w-3 bg-orbit-ink/18"}`} />
             </div>
           ) : (
-            <p className="text-center text-sm font-bold text-orbit-ink/62">
+            <p className="text-center text-sm font-bold text-orbit-ink/68">
               Don&apos;t have an account?{" "}
               <button type="button" onClick={() => switchMode("signup")} className="font-black text-[#705d00] dark:text-[#EFBF04]">
                 Sign Up
@@ -509,26 +509,26 @@ function SignInPanel({
       }}
     >
       <div className="text-center">
-        <h2 className="text-2xl font-black text-orbit-ink">Welcome Back</h2>
-        <p className="mt-2 text-sm font-semibold text-orbit-ink/75">Sign in to your RentOrbit account</p>
+        <h2 className="auth-modal-title">Welcome back</h2>
+        <p className="auth-modal-copy mt-2">Sign in to your RentOrbit account</p>
       </div>
 
       <label className="block">
         <span className={modalLabelClass}>Email address</span>
-        <input value={email} onChange={(event) => setEmail(event.target.value)} className={modalFieldClass} placeholder="name@company.com" type="email" autoComplete="email" />
+        <input value={email} onChange={(event) => setEmail(event.target.value)} className={modalFieldClass} placeholder="Enter email address" type="email" autoComplete="email" />
       </label>
 
       <label className="block">
         <span className={modalLabelClass}>Password</span>
         <div className="relative">
-          <input value={password} onChange={(event) => setPassword(event.target.value)} className={`${modalFieldClass} pr-12`} placeholder="••••••••" type={showPassword ? "text" : "password"} autoComplete="current-password" />
-          <button type="button" onClick={() => setShowPassword((current) => !current)} className="absolute right-3 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-orbit-ink/45">
+          <input value={password} onChange={(event) => setPassword(event.target.value)} className={`${modalFieldClass} pr-12`} placeholder="Enter password" type={showPassword ? "text" : "password"} autoComplete="current-password" />
+          <button type="button" onClick={() => setShowPassword((current) => !current)} className="absolute right-3 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-orbit-ink/55">
             {showPassword ? <EyeOff className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}
           </button>
         </div>
       </label>
 
-      <div className="flex items-center justify-between gap-3 text-xs font-semibold text-orbit-ink/68">
+      <div className="flex items-center justify-between gap-3 text-xs font-bold text-orbit-ink/68">
         <label className="flex items-center gap-2">
           <input type="checkbox" className="h-4 w-4 rounded accent-[#EFBF04]" />
           Keep me signed in
@@ -582,18 +582,18 @@ function IdentityPanel({
       }}
     >
       <div>
-        <h2 className="text-2xl font-black text-orbit-ink">Identity verification</h2>
-        <p className="mt-2 text-sm font-semibold text-orbit-ink/75">Provide your legal details for IPRS validation.</p>
+        <h2 className="auth-modal-title">Identity verification</h2>
+        <p className="auth-modal-copy mt-2">Provide your legal details for IPRS validation.</p>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <label className="block">
           <span className={modalLabelClass}>First name</span>
-          <input value={firstName} onChange={(event) => setFirstName(event.target.value)} className={modalFieldClass} placeholder="e.g. Kwame" type="text" autoComplete="given-name" />
+          <input value={firstName} onChange={(event) => setFirstName(event.target.value)} className={modalFieldClass} placeholder="Enter first name" type="text" autoComplete="given-name" />
         </label>
         <label className="block">
           <span className={modalLabelClass}>Last name</span>
-          <input value={lastName} onChange={(event) => setLastName(event.target.value)} className={modalFieldClass} placeholder="e.g. Omondi" type="text" autoComplete="family-name" />
+          <input value={lastName} onChange={(event) => setLastName(event.target.value)} className={modalFieldClass} placeholder="Enter last name" type="text" autoComplete="family-name" />
         </label>
       </div>
 
@@ -603,17 +603,18 @@ function IdentityPanel({
         options={idTypeOptions}
         onChange={(value) => setIdType(value as IdType)}
         labelClassName={modalLabelClass}
-        buttonClassName="auth-modal-field flex min-h-12 w-full items-center gap-3 py-2 pl-3 pr-2 text-left"
+        buttonClassName="auth-modal-field flex min-h-12 w-full items-center gap-3 py-2 pl-3.5 pr-2 text-left"
+        arrowClassName="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-orbit-panel/88 text-orbit-ink/68"
         menuClassName="absolute left-0 right-0 top-[calc(100%+8px)] z-[130] overflow-hidden rounded-[24px] bg-orbit-panel p-2 shadow-[0_18px_42px_rgba(25,32,29,0.14)]"
         leadingIcon={<IdCard className="h-4 w-4" aria-hidden="true" />}
       />
 
       <label className="block">
         <span className={modalLabelClass}>{idType} number</span>
-        <input value={idNumber} onChange={(event) => setIdNumber(event.target.value)} className={`${modalFieldClass} uppercase`} placeholder="Enter identification number" type="text" autoComplete="off" />
+        <input value={idNumber} onChange={(event) => setIdNumber(event.target.value)} className={`${modalFieldClass} uppercase`} placeholder="Enter ID number" type="text" autoComplete="off" />
       </label>
 
-      <div className="flex min-h-16 gap-3 rounded-[18px] bg-orbit-field/70 p-3 text-xs font-semibold leading-5 text-orbit-ink/75">
+      <div className="auth-modal-note flex min-h-16 gap-3 rounded-[18px] p-3 text-xs font-semibold leading-5">
         <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-[#EFBF04]" aria-hidden="true" />
         Your data is encrypted and verified through IPRS. We do not store raw ID credentials.
       </div>
@@ -677,26 +678,26 @@ function SignupCredentialsPanel({
         <div className="grid grid-cols-[1fr_1fr_auto] items-center gap-2">
           <span className="h-1 rounded-full bg-[#EFBF04]" />
           <span className="h-1 rounded-full bg-[#EFBF04]" />
-          <span className="text-xs font-bold text-orbit-ink/45">Step 2 of 2</span>
+          <span className="text-xs font-bold text-orbit-ink/58">Step 2 of 2</span>
         </div>
-        <h2 className="mt-8 text-2xl font-black text-orbit-ink">Complete Your Account</h2>
-        <p className="mt-2 text-sm font-semibold leading-6 text-orbit-ink/75">Your identity has been verified. Now, set up your login details.</p>
+        <h2 className="auth-modal-title mt-8">Complete your account</h2>
+        <p className="auth-modal-copy mt-2 leading-6">Your identity has been verified. Now, set up your login details.</p>
       </div>
 
       <label className="block">
-        <span className={modalLabelClass}>Email Address</span>
+        <span className={modalLabelClass}>Email address</span>
         <div className="relative">
-          <input value={email} onChange={(event) => setEmail(event.target.value)} className={`${modalFieldClass} pr-11`} placeholder="name@company.com" type="email" autoComplete="email" />
-          {emailValid ? <CheckCircle2 className="absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#EFBF04]" aria-hidden="true" /> : <Mail className="absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-orbit-ink/32" aria-hidden="true" />}
+          <input value={email} onChange={(event) => setEmail(event.target.value)} className={`${modalFieldClass} pr-11`} placeholder="Enter email address" type="email" autoComplete="email" />
+          {emailValid ? <CheckCircle2 className="absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#EFBF04]" aria-hidden="true" /> : <Mail className="absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-orbit-ink/42" aria-hidden="true" />}
         </div>
       </label>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <PasswordField label="Password" value={password} onChange={setPassword} valid={passwordValid} show={showPassword} setShow={setShowPassword} />
-        <PasswordField label="Confirm Password" value={confirmPassword} onChange={setConfirmPassword} valid={Boolean(confirmPassword && passwordsMatch)} show={showConfirmPassword} setShow={setShowConfirmPassword} />
+        <PasswordField label="Confirm password" value={confirmPassword} onChange={setConfirmPassword} valid={Boolean(confirmPassword && passwordsMatch)} show={showConfirmPassword} setShow={setShowConfirmPassword} />
       </div>
 
-      <div className="flex min-h-16 gap-3 rounded-[18px] bg-orbit-field/70 p-3 text-xs font-semibold leading-5 text-orbit-ink/75">
+      <div className="auth-modal-note flex min-h-16 gap-3 rounded-[18px] p-3 text-xs font-semibold leading-5">
         <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-[#EFBF04]" aria-hidden="true" />
         Ensure your password contains at least 8 characters, including a mix of letters, numbers, and symbols.
       </div>
@@ -730,8 +731,8 @@ function PasswordField({
     <label className="block">
       <span className={modalLabelClass}>{label}</span>
       <div className="relative">
-        <input value={value} onChange={(event) => onChange(event.target.value)} className={`${modalFieldClass} pr-10`} placeholder="••••••••" type={show ? "text" : "password"} autoComplete="new-password" />
-        <button type="button" onClick={() => setShow((current) => !current)} className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-orbit-ink/42">
+        <input value={value} onChange={(event) => onChange(event.target.value)} className={`${modalFieldClass} pr-10`} placeholder={label === "Confirm password" ? "Confirm password" : "Enter password"} type={show ? "text" : "password"} autoComplete="new-password" />
+        <button type="button" onClick={() => setShow((current) => !current)} className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-orbit-ink/55">
           {valid ? <CheckCircle2 className="h-4 w-4 text-[#EFBF04]" aria-hidden="true" /> : show ? <EyeOff className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}
         </button>
       </div>
@@ -749,7 +750,7 @@ function MessageSlot({
   compact?: boolean;
 }) {
   return (
-    <div className={`${compact ? "min-h-[18px]" : "min-h-5"} text-xs font-bold ${tone === "error" ? "text-red-700 dark:text-red-300" : "text-orbit-ink/58"}`}>
+    <div className={`${compact ? "min-h-[18px]" : "min-h-5"} text-xs font-bold ${tone === "error" ? "text-red-700 dark:text-red-300" : "text-orbit-ink/64"}`}>
       {message}
     </div>
   );
