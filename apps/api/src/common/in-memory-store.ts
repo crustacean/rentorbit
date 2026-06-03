@@ -1,11 +1,11 @@
 import {
-  seededListings,
   type ContractSummary,
   type KycStatus,
   type ListingIntelligenceProfile,
   type ResourceListing,
   type SearchIntelligenceSession
 } from "@rentorbit/shared";
+import { seededListings } from "@rentorbit/shared/sample-data";
 
 export type UserRecord = {
   id: string;

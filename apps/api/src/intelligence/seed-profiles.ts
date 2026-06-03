@@ -1,5 +1,6 @@
 import { ConfigService } from "@nestjs/config";
-import { buildLocalListingIntelligence, seededListings } from "@rentorbit/shared";
+import { buildLocalListingIntelligence } from "@rentorbit/shared";
+import { seededListings } from "@rentorbit/shared/sample-data";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { OpenAiIntelligenceClient } from "./openai-intelligence.client.js";
