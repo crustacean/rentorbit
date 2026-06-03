@@ -1,7 +1,10 @@
 node_modules
 npm-debug.log*
+.npm-cache
+.cache
 .next
 apps/web/.next
+apps/web/.next/cache
 apps/api/dist
 packages/shared/dist
 .git
@@ -9,5 +12,9 @@ packages/shared/dist
 .env
 .env.*
 prepared-*.yaml
+prepared-k8s
 coverage
+logs
+*.log
+tmp
 .DS_Store
