@@ -1979,10 +1979,10 @@ function AccountFocusedListingOverlay({
             <button
               type="button"
               onClick={onClose}
-              className="absolute left-5 top-5 z-30 flex h-16 w-16 items-center justify-center rounded-full bg-orbit-panel text-orbit-ink shadow-[0_12px_30px_rgba(25,32,29,0.18)] transition-colors hover:bg-orbit-soft"
+              className="focused-view-close-button absolute z-30 flex items-center justify-center rounded-full bg-orbit-panel text-orbit-ink shadow-[0_12px_30px_rgba(25,32,29,0.18)] transition-colors hover:bg-orbit-soft"
               title="Close"
             >
-              <X className="h-8 w-8" aria-hidden="true" />
+              <X aria-hidden="true" />
               <span className="sr-only">Close focused listing</span>
             </button>
 
