@@ -199,6 +199,14 @@ function bookedUnitsLabel(bookedCount: number, totalCount: number): string {
   return `${booked}:${total} BOOKED`;
 }
 
+function availabilityTagStatus(bookedCount: number, totalCount: number): "available" | "partial" | "booked" {
+  const total = Math.max(1, Math.floor(totalCount));
+  const booked = Math.min(total, Math.max(0, Math.floor(bookedCount)));
+  if (booked <= 0) return "available";
+  if (booked < total) return "partial";
+  return "booked";
+}
+
 const seededInventoryTotals: Record<string, number> = {
   lst_events_tent_nairobi_005: 8,
   lst_events_chairs_kiambu_006: 120,
@@ -1726,7 +1734,7 @@ function BookingDetailsContent({
           <span className="kind-tag orbit-tag rounded-full" data-kind={listing.kind}>
             {listingKindLabel(listing.kind)}
           </span>
-          <span className="availability-tag orbit-tag ml-auto shrink-0 rounded-full" data-status={bookedUnits > 0 ? "booked" : "available"}>
+          <span className="availability-tag orbit-tag ml-auto shrink-0 rounded-full" data-status={availabilityTagStatus(bookedUnits, totalUnits)}>
             {bookedUnitsLabel(bookedUnits, totalUnits)}
           </span>
         </div>

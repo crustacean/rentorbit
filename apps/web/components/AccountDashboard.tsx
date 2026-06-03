@@ -278,6 +278,14 @@ function bookedUnitsLabel(bookedCount: number, totalCount: number): string {
   return `${booked}:${total} BOOKED`;
 }
 
+function availabilityTagStatus(bookedCount: number, totalCount: number): "available" | "partial" | "booked" {
+  const total = Math.max(1, Math.floor(totalCount));
+  const booked = Math.min(total, Math.max(0, Math.floor(bookedCount)));
+  if (booked <= 0) return "available";
+  if (booked < total) return "partial";
+  return "booked";
+}
+
 function statusTagTone(status: string): "available" | "booked" | "pending" | "neutral" {
   const normalized = status.toLowerCase();
   if (normalized.includes("available")) return "available";
@@ -2145,7 +2153,7 @@ function AccountFocusedDetailsPanel({
               {listingKindLabel(listing.kind)}
             </span>
             <span className="orbit-tag rounded-full bg-orbit-soft px-[15px] py-[7px]">{mobilityLabel(listingMobility(listing))}</span>
-            <span className="availability-tag orbit-tag ml-auto shrink-0 rounded-full" data-status={bookedUnits > 0 ? "booked" : "available"}>
+            <span className="availability-tag orbit-tag ml-auto shrink-0 rounded-full" data-status={availabilityTagStatus(bookedUnits, totalUnits)}>
               {bookedUnitsLabel(bookedUnits, totalUnits)}
             </span>
           </div>

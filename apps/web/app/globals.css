@@ -537,8 +537,9 @@ textarea:focus-visible {
   --tag-rgb: 139 92 246;
 }
 
-.availability-tag[data-status="available"] {
-  --tag-rgb: 16 185 129;
+.availability-tag[data-status="available"],
+.availability-tag[data-status="partial"] {
+  --tag-rgb: 245 158 11;
 }
 
 .availability-tag[data-status="booked"] {
