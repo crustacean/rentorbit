@@ -18,8 +18,8 @@ type SiteHeaderProps = {
 
 function navLinkClass(active: boolean) {
   return active
-    ? "border-b-2 border-orbit-green pb-1 text-sm font-black text-orbit-green"
-    : "text-sm font-bold text-orbit-ink/62 transition-colors hover:text-orbit-green";
+    ? "site-header-nav-link border-b-2 border-orbit-green pb-1 font-black text-orbit-green"
+    : "site-header-nav-link font-bold text-orbit-ink/62 transition-colors hover:text-orbit-green";
 }
 
 export function SiteHeader({ active = "home", sessionEmail, onSignOut }: SiteHeaderProps) {
@@ -80,31 +80,29 @@ export function SiteHeader({ active = "home", sessionEmail, onSignOut }: SiteHea
   return (
     <>
       <header className="theme-body-border sticky top-0 z-50 border-b border-orbit-line/35 bg-orbit-field/78 backdrop-blur-xl">
-        <div className="site-header-inner mx-auto flex w-full max-w-7xl items-center justify-between">
-          <div className="flex min-w-0 items-center gap-3 sm:gap-8">
-            <Link href="/" className="site-header-logo min-w-0 shrink font-black leading-none text-orbit-green" aria-label="RentOrbit home">
-              RentOrbit
-            </Link>
+        <div className="site-header-inner mx-auto grid w-full max-w-7xl items-center">
+          <Link href="/" className="site-header-logo min-w-0 shrink font-black leading-none text-orbit-green" aria-label="RentOrbit home">
+            RentOrbit
+          </Link>
 
-            <nav className="hidden items-center gap-6 md:flex" aria-label="Primary">
-              <Link href="/marketplace" className={navLinkClass(active === "rent")}>
-                Rent
+          <nav className="site-header-nav items-center justify-center" aria-label="Primary">
+            <Link href="/marketplace" className={navLinkClass(active === "rent")}>
+              Rent
+            </Link>
+            {isSignedIn ? (
+              <Link href="/account" className={navLinkClass(active === "account")}>
+                List Your Item
               </Link>
-              {isSignedIn ? (
-                <Link href="/account" className={navLinkClass(active === "account")}>
-                  List Your Item
-                </Link>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => openAuthModal("signup", "account")}
-                  className={`${navLinkClass(active === "account")} focus-visible:outline-none`}
-                >
-                  List Your Item
-                </button>
-              )}
-            </nav>
-          </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => openAuthModal("signup", "account")}
+                className={`${navLinkClass(active === "account")} focus-visible:outline-none`}
+              >
+                List Your Item
+              </button>
+            )}
+          </nav>
 
           <div className="site-header-actions flex min-w-0 shrink-0 items-center">
             <ThemeSwitcher compact />

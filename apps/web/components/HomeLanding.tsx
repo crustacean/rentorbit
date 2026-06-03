@@ -176,11 +176,14 @@ function FeaturedRentalCard({ listing, priority }: { listing: ResourceListing; p
 function HomeFooter() {
   return (
     <footer className="home-footer-divider border-t bg-orbit-field px-5 py-12 sm:px-8 lg:px-16">
-      <nav className="mx-auto flex w-full max-w-7xl flex-col items-center justify-center gap-5 text-sm font-semibold text-orbit-ink/62 sm:flex-row" aria-label="Footer">
-        <Link href="/terms" className="hover:text-orbit-green">Terms</Link>
-        <Link href="/privacy" className="hover:text-orbit-green">Privacy</Link>
-        <a href="mailto:hello@rentorbit.co.ke" className="hover:text-orbit-green">Contact</a>
-      </nav>
+      <div className="home-footer-content mx-auto w-full max-w-7xl">
+        <Link href="/" className="home-footer-brand font-black text-orbit-green">RentOrbit</Link>
+        <nav className="home-footer-links font-semibold text-orbit-ink/62" aria-label="Footer">
+          <Link href="/terms" className="hover:text-orbit-green">Terms</Link>
+          <Link href="/privacy" className="hover:text-orbit-green">Privacy</Link>
+          <a href="mailto:hello@rentorbit.co.ke" className="hover:text-orbit-green">Contact</a>
+        </nav>
+      </div>
     </footer>
   );
 }
