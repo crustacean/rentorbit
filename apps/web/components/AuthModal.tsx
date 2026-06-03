@@ -48,7 +48,7 @@ const accountsKey = "rentorbit:accounts";
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 const idTypes: IdType[] = ["National ID", "Passport number", "Alien ID"];
 const idTypeOptions: CustomSelectOption[] = idTypes.map((option) => ({ value: option, label: option }));
-const modalFieldClass = cn(ui.field, "min-h-12");
+const modalFieldClass = "auth-modal-field min-h-12 w-full px-3 py-3";
 const modalLabelClass = ui.label;
 const modalActionClass = cn(ui.goldPill, "min-h-[52px] w-full rounded-[14px] px-5 text-sm shadow-[0_14px_34px_rgba(239,191,4,0.18)] active:scale-[0.98]");
 
@@ -603,7 +603,7 @@ function IdentityPanel({
         options={idTypeOptions}
         onChange={(value) => setIdType(value as IdType)}
         labelClassName={modalLabelClass}
-        buttonClassName={cn(ui.field, "flex min-h-12 items-center gap-3 py-2 pl-3 pr-2 text-left")}
+        buttonClassName="auth-modal-field flex min-h-12 w-full items-center gap-3 py-2 pl-3 pr-2 text-left"
         menuClassName="absolute left-0 right-0 top-[calc(100%+8px)] z-[130] overflow-hidden rounded-[24px] bg-orbit-panel p-2 shadow-[0_18px_42px_rgba(25,32,29,0.14)]"
         leadingIcon={<IdCard className="h-4 w-4" aria-hidden="true" />}
       />

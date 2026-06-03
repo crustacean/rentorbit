@@ -431,6 +431,40 @@ textarea:focus-visible {
   -webkit-backdrop-filter: blur(24px) saturate(145%);
 }
 
+.auth-modal-field {
+  background: rgb(var(--color-orbit-field) / 0.76);
+  border: 0;
+  border-radius: 14px;
+  box-shadow: none;
+  color: rgb(var(--color-orbit-ink));
+  font-size: 1rem;
+  font-weight: 600;
+  inline-size: 100%;
+  min-inline-size: 0;
+  outline: 0;
+}
+
+.auth-modal-field:hover {
+  background: rgb(var(--color-orbit-field) / 0.92);
+}
+
+.auth-modal-field:focus,
+.auth-modal-field:focus-visible {
+  background: rgb(var(--color-orbit-field));
+  border: 0;
+  box-shadow: none;
+  outline: 0;
+}
+
+.auth-modal-field::placeholder {
+  color: rgb(var(--color-orbit-ink) / 0.42);
+}
+
+.auth-modal-card label,
+.auth-modal-card .relative {
+  min-inline-size: 0;
+}
+
 :root[data-theme="dark"] .featured-rental-glass {
   background: rgb(18 18 18 / 0.62);
   color: rgb(var(--color-orbit-ink));

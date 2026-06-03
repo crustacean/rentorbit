@@ -175,7 +175,7 @@ function FeaturedRentalCard({ listing, priority }: { listing: ResourceListing; p
 
 function HomeFooter() {
   return (
-    <footer className="home-footer-divider border-t bg-orbit-field px-5 py-12 sm:px-8 lg:px-16">
+    <footer className="home-footer-divider border-t bg-orbit-field px-5 py-[clamp(1.5rem,4vw,3rem)] sm:px-8 lg:px-16">
       <div className="home-footer-content mx-auto w-full max-w-7xl">
         <Link href="/" className="home-footer-brand font-black text-orbit-green">RentOrbit</Link>
         <nav className="home-footer-links font-semibold text-orbit-ink/62" aria-label="Footer">
