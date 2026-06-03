@@ -80,9 +80,9 @@ export function SiteHeader({ active = "home", sessionEmail, onSignOut }: SiteHea
   return (
     <>
       <header className="theme-body-border sticky top-0 z-50 border-b border-white/70 bg-orbit-panel/82 backdrop-blur-xl">
-        <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-2 px-2 py-3 sm:gap-4 sm:px-8 sm:py-4 lg:px-16">
-          <div className="flex min-w-0 items-center gap-4 sm:gap-8">
-            <Link href="/" className="min-w-0 shrink text-[clamp(1rem,5vw,1.5rem)] font-black leading-none text-orbit-green" aria-label="RentOrbit home">
+        <div className="site-header-inner mx-auto flex w-full max-w-7xl items-center justify-between">
+          <div className="flex min-w-0 items-center gap-3 sm:gap-8">
+            <Link href="/" className="site-header-logo min-w-0 shrink font-black leading-none text-orbit-green" aria-label="RentOrbit home">
               RentOrbit
             </Link>
 
@@ -106,12 +106,12 @@ export function SiteHeader({ active = "home", sessionEmail, onSignOut }: SiteHea
             </nav>
           </div>
 
-          <div className="flex min-w-0 shrink-0 items-center gap-1 sm:gap-4">
+          <div className="site-header-actions flex min-w-0 shrink-0 items-center">
             <ThemeSwitcher compact />
             {isSignedIn ? (
               <Link
                 href="/account"
-                className={cn(ui.panelPill, "min-h-10 w-[clamp(62px,18vw,92px)] px-2 text-[10px] sm:min-h-11 sm:text-sm")}
+                className={cn(ui.panelPill, "site-header-auth-pill")}
               >
                 Account
               </Link>
@@ -119,7 +119,7 @@ export function SiteHeader({ active = "home", sessionEmail, onSignOut }: SiteHea
               <button
                 type="button"
                 onClick={() => openAuthModal("signin")}
-                className={cn(ui.panelPill, "min-h-10 w-[clamp(62px,18vw,92px)] px-2 text-[10px] sm:min-h-11 sm:text-sm")}
+                className={cn(ui.panelPill, "site-header-auth-pill")}
               >
                 Sign In
               </button>
@@ -128,7 +128,7 @@ export function SiteHeader({ active = "home", sessionEmail, onSignOut }: SiteHea
               <button
                 type="button"
                 onClick={handleSignOut}
-                className={cn(ui.goldPill, "min-h-10 w-[clamp(68px,19vw,92px)] px-2 text-[10px] sm:min-h-11 sm:text-sm")}
+                className={cn(ui.goldPill, "site-header-auth-pill")}
               >
                 Sign out
               </button>
@@ -136,7 +136,7 @@ export function SiteHeader({ active = "home", sessionEmail, onSignOut }: SiteHea
               <button
                 type="button"
                 onClick={() => openAuthModal("signup")}
-                className={cn(ui.goldPill, "min-h-10 w-[clamp(62px,18vw,92px)] px-2 text-[10px] sm:min-h-11 sm:text-sm")}
+                className={cn(ui.goldPill, "site-header-auth-pill")}
               >
                 Sign Up
               </button>

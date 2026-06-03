@@ -1383,25 +1383,25 @@ function MobilePanelBar({ onOpen }: { onOpen: (panel: MobilePanel) => void }) {
       <button
         type="button"
         onClick={() => onOpen("discovery")}
-        className="theme-body-border inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-orbit-panel/92 px-3 text-xs font-black text-orbit-ink ring-1 ring-white/70"
+        className="mobile-panel-button theme-body-border inline-flex items-center justify-center rounded-full bg-orbit-panel/92 font-black text-orbit-ink ring-1 ring-white/70"
       >
-        <Filter className="h-4 w-4 text-orbit-green" aria-hidden="true" />
+        <Filter className="text-orbit-green" aria-hidden="true" />
         Discovery
       </button>
       <button
         type="button"
         onClick={() => onOpen("metrics")}
-        className="theme-body-border inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-orbit-panel/92 px-3 text-xs font-black text-orbit-ink ring-1 ring-white/70"
+        className="mobile-panel-button theme-body-border inline-flex items-center justify-center rounded-full bg-orbit-panel/92 font-black text-orbit-ink ring-1 ring-white/70"
       >
-        <MapPin className="h-4 w-4 text-orbit-green" aria-hidden="true" />
+        <MapPin className="text-orbit-green" aria-hidden="true" />
         Metrics
       </button>
       <button
         type="button"
         onClick={() => onOpen("details")}
-        className="theme-body-border inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-orbit-panel/92 px-3 text-xs font-black text-orbit-ink ring-1 ring-white/70"
+        className="mobile-panel-button theme-body-border inline-flex items-center justify-center rounded-full bg-orbit-panel/92 font-black text-orbit-ink ring-1 ring-white/70"
       >
-        <PackageCheck className="h-4 w-4 text-orbit-green" aria-hidden="true" />
+        <PackageCheck className="text-orbit-green" aria-hidden="true" />
         Details
       </button>
     </div>
