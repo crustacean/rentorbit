@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { listingImageCompressionDefaults, normalizeListingImageUrl, seededListings } from "../src/index.js";
+import { listingImageCompressionDefaults, normalizeListingImageUrl } from "../src/index.js";
+import { seededListings } from "../src/sample-data.js";
 
 describe("listing image preparation", () => {
   it("normalizes Unsplash media URLs to a 5:7 compressed crop", () => {

@@ -40,7 +40,8 @@ import {
   type ListingImageCropFocus
 } from "@/lib/listingImageUpload";
 import { cn, ui } from "@/lib/ui";
-import { calculateBookingQuote, publicLocationOffset, seededListings, type Coordinates, type OperationMode, type ResourceListing } from "@rentorbit/shared";
+import { calculateBookingQuote, publicLocationOffset, type Coordinates, type OperationMode, type ResourceListing } from "@rentorbit/shared";
+import { seededListings } from "@rentorbit/shared/sample-data";
 import { useEffect, useMemo, useState, type CSSProperties, type Dispatch, type SetStateAction } from "react";
 
 export type AccountDashboardProps = {

@@ -5,15 +5,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { SiteHeader } from "@/components/SiteHeader";
+import { homeFeaturedListings, type HomeFeaturedListing } from "@/lib/homeFeaturedListings";
 import { startSearchIntelligenceSession } from "@/lib/intelligence";
 import { listingThumbnailUrl } from "@/lib/listingImageUrls";
 import { cn, ui } from "@/lib/ui";
-import { seededListings, type ResourceListing } from "@rentorbit/shared";
-
-const featuredListings = [...seededListings]
-  .filter((listing) => listing.status === "active" && listing.media.length > 0)
-  .sort((left, right) => right.rating * 100 + right.reviewCount - (left.rating * 100 + left.reviewCount))
-  .slice(0, 3);
 
 const popularSearches = [
   { label: "Camping", href: "/marketplace?search=camping" },
@@ -81,6 +76,7 @@ export function HomeLanding() {
               <Link
                 key={item.label}
                 href={item.href}
+                prefetch={false}
                 className={cn(ui.panelPill, "theme-body-border shrink-0 px-4 py-2 text-xs text-orbit-ink/66 hover:bg-orbit-panel hover:text-orbit-green")}
               >
                 {item.label}
@@ -96,14 +92,14 @@ export function HomeLanding() {
             <h2 className="text-2xl font-semibold tracking-[-0.01em] text-orbit-ink sm:text-3xl">Featured Rentals</h2>
             <p className="mt-1 text-sm font-normal text-orbit-ink/62 sm:text-base">High-quality equipment curated for you.</p>
           </div>
-          <Link href="/marketplace" className="hidden items-center gap-2 text-sm font-black text-orbit-green hover:underline sm:inline-flex">
+          <Link href="/marketplace" prefetch={false} className="hidden items-center gap-2 text-sm font-black text-orbit-green hover:underline sm:inline-flex">
             View all
             <ArrowRight className="h-4 w-4" aria-hidden="true" />
           </Link>
         </div>
 
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {featuredListings.map((listing, index) => (
+          {homeFeaturedListings.map((listing, index) => (
             <FeaturedRentalCard key={listing.id} listing={listing} priority={index === 0} />
           ))}
         </div>
@@ -118,6 +114,7 @@ export function HomeLanding() {
             </p>
             <Link
               href={listItemHref}
+              prefetch={false}
               className="mt-8 inline-flex min-h-14 items-center justify-center rounded-full bg-[#705d00] px-8 text-sm font-black text-white transition-colors hover:bg-[#544600] focus-visible:outline-none"
             >
               List Your Item Now
@@ -131,21 +128,21 @@ export function HomeLanding() {
   );
 }
 
-function FeaturedRentalCard({ listing, priority }: { listing: ResourceListing; priority: boolean }) {
-  const media = listing.media[0];
-  const thumbnailUrl = media ? listingThumbnailUrl(media.url, 720, 900) : undefined;
-  const price = kes(listing.modeRules[0]?.pricing.rate.amount ?? 0);
+function FeaturedRentalCard({ listing, priority }: { listing: HomeFeaturedListing; priority: boolean }) {
+  const thumbnailUrl = listingThumbnailUrl(listing.media.url, 720, 900);
+  const price = kes(listing.rateAmount);
 
   return (
     <Link
       href={`/marketplace?listing=${encodeURIComponent(listing.id)}`}
+      prefetch={false}
       className="group relative overflow-hidden rounded-[32px] bg-orbit-panel text-left focus-visible:outline-none"
     >
       <div className="relative aspect-[4/5] overflow-hidden rounded-[32px] ring-1 ring-orbit-line/35">
         {thumbnailUrl ? (
           <img
             src={thumbnailUrl}
-            alt={media?.alt || listing.title}
+            alt={listing.media.alt || listing.title}
             loading={priority ? "eager" : "lazy"}
             decoding="async"
             fetchPriority={priority ? "high" : undefined}

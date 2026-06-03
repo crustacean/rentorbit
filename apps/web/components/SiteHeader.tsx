@@ -1,12 +1,17 @@
 "use client";
 
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { AuthModal, type AccountMode } from "@/components/AuthModal";
+import type { AccountMode } from "@/components/AuthModal";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import { accountSessionUpdatedEvent, clearAccountSession, readAccountSession } from "@/lib/accountSession";
 import { cn, ui } from "@/lib/ui";
+
+const AuthModal = dynamic(() => import("@/components/AuthModal").then((module) => module.AuthModal), {
+  ssr: false
+});
 
 type SiteHeaderActive = "home" | "rent" | "account";
 
@@ -86,11 +91,11 @@ export function SiteHeader({ active = "home", sessionEmail, onSignOut }: SiteHea
           </Link>
 
           <nav className="site-header-nav items-center justify-center" aria-label="Primary">
-            <Link href="/marketplace" className={navLinkClass(active === "rent")}>
+            <Link href="/marketplace" prefetch={false} className={navLinkClass(active === "rent")}>
               Rent
             </Link>
             {isSignedIn ? (
-              <Link href="/account" className={navLinkClass(active === "account")}>
+              <Link href="/account" prefetch={false} className={navLinkClass(active === "account")}>
                 List Your Item
               </Link>
             ) : (
@@ -109,6 +114,7 @@ export function SiteHeader({ active = "home", sessionEmail, onSignOut }: SiteHea
             {isSignedIn ? (
               <Link
                 href="/account"
+                prefetch={false}
                 className={cn(ui.panelPill, "site-header-auth-pill")}
               >
                 Account
@@ -143,12 +149,14 @@ export function SiteHeader({ active = "home", sessionEmail, onSignOut }: SiteHea
         </div>
       </header>
 
-      <AuthModal
-        open={authModalOpen}
-        initialMode={authModalMode}
-        onClose={() => setAuthModalOpen(false)}
-        onAuthenticated={handleAuthenticated}
-      />
+      {authModalOpen ? (
+        <AuthModal
+          open={authModalOpen}
+          initialMode={authModalMode}
+          onClose={() => setAuthModalOpen(false)}
+          onAuthenticated={handleAuthenticated}
+        />
+      ) : null}
     </>
   );
 }

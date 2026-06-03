@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 import { CustomSelect, type CustomSelectOption } from "@/components/CustomSelect";
 import { SiteHeader } from "@/components/SiteHeader";
-import { AuthModal, type AccountMode } from "@/components/AuthModal";
+import type { AccountMode } from "@/components/AuthModal";
 import { readAccountSession } from "@/lib/accountSession";
 import {
   readSearchIntelligenceSession,
@@ -43,7 +43,6 @@ import {
   kenyaCounties,
   marketplaceCategories,
   publicLocationOffset,
-  seededListings,
   type ContractSummary,
   type Coordinates,
   type OperationMode,
@@ -53,6 +52,7 @@ import {
   type SearchIntelligenceTag,
   type SearchResult
 } from "@rentorbit/shared";
+import { seededListings } from "@rentorbit/shared/sample-data";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 const DateInput = dynamic(
@@ -79,6 +79,10 @@ const FocusedListingOverlay = dynamic(
     )
   }
 );
+
+const AuthModal = dynamic(() => import("@/components/AuthModal").then((module) => module.AuthModal), {
+  ssr: false
+});
 
 const countyOrigins: Record<string, Coordinates> = {
   Nairobi: { latitude: -1.286389, longitude: 36.817223 },
@@ -455,12 +459,6 @@ function focusedGalleryForListing(listing: ResourceListing) {
   return [...listing.media, ...relatedMedia].slice(0, 6);
 }
 
-function registerServiceWorker() {
-  if (typeof window !== "undefined" && "serviceWorker" in navigator) {
-    navigator.serviceWorker.register("/sw.js").catch(() => undefined);
-  }
-}
-
 export function MarketplaceExperience() {
   const firstListing = seededListings[0];
   const requestedListingRef = useRef<string | null>(null);
@@ -501,8 +499,6 @@ export function MarketplaceExperience() {
   const [searchStatus, setSearchStatus] = useState<SearchStatus>("idle");
   const searchRequestIdRef = useRef(0);
   const closeDiscoveryAfterSearchRef = useRef(false);
-
-  useEffect(registerServiceWorker, []);
 
   useEffect(() => {
     const existingIntelligenceSession = readSearchIntelligenceSession();
@@ -1184,12 +1180,14 @@ export function MarketplaceExperience() {
         />
       ) : null}
 
-      <AuthModal
-        open={authModalOpen}
-        initialMode={authModalMode}
-        onClose={closeDmAuthModal}
-        onAuthenticated={handleDmAuthenticated}
-      />
+      {authModalOpen ? (
+        <AuthModal
+          open={authModalOpen}
+          initialMode={authModalMode}
+          onClose={closeDmAuthModal}
+          onAuthenticated={handleDmAuthenticated}
+        />
+      ) : null}
     </main>
   );
 }
