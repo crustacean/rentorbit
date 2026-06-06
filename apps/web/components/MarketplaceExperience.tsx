@@ -55,7 +55,7 @@ import {
   type SearchResult
 } from "@rentorbit/shared";
 import { seededListings } from "@rentorbit/shared/sample-data";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { type CSSProperties, type RefObject, useEffect, useMemo, useRef, useState } from "react";
 
 const FocusedListingOverlay = dynamic(
   () => import("@/components/MarketplaceFocusedOverlay").then((module) => module.FocusedListingOverlay),
@@ -147,9 +147,9 @@ const initialFilters: FilterState = {
   query: "",
   category: "all",
   county: "all",
-  radiusKm: 50,
+  radiusKm: 300,
   operationMode: "all",
-  includeCountrywide: true,
+  includeCountrywide: false,
   start: "2026-06-16T09:00",
   end: "2026-06-17T09:00"
 };
@@ -502,6 +502,7 @@ export function MarketplaceExperience() {
   const [compactSearchVisible, setCompactSearchVisible] = useState(false);
   const [mobileHeaderSearch, setMobileHeaderSearch] = useState(false);
   const marketplaceContentRef = useRef<HTMLElement | null>(null);
+  const mobileSettingsButtonRef = useRef<HTMLButtonElement | null>(null);
   const searchRequestIdRef = useRef(0);
 
   useEffect(() => {
@@ -532,7 +533,7 @@ export function MarketplaceExperience() {
       category: "all",
       county: "all",
       operationMode: "all",
-      includeCountrywide: true
+      includeCountrywide: initialFilters.includeCountrywide
     });
     setSelectedId(requestedListing.id);
     setSelectedMode(requestedListing.modeRules[0]?.mode ?? "self_operated");
@@ -658,8 +659,9 @@ export function MarketplaceExperience() {
       filters.query.trim().length > 0 ||
       filters.category !== "all" ||
       filters.county !== "all" ||
+      filters.radiusKm !== initialFilters.radiusKm ||
       filters.operationMode !== "all" ||
-      !filters.includeCountrywide;
+      filters.includeCountrywide !== initialFilters.includeCountrywide;
 
     if (aiTagsCleared && !filters.query.trim()) {
       searchRequestIdRef.current += 1;
@@ -915,9 +917,9 @@ export function MarketplaceExperience() {
         query: "",
         category: "all",
         county: "all",
-        radiusKm: 300,
+        radiusKm: initialFilters.radiusKm,
         operationMode: "all",
-        includeCountrywide: true
+        includeCountrywide: initialFilters.includeCountrywide
       })
     );
     setBookingQuantity("1");
@@ -1076,6 +1078,7 @@ export function MarketplaceExperience() {
             filters={filters}
             patchFilters={patchFilters}
             searchBusy={searchBusy}
+            settingsButtonRef={mobileSettingsButtonRef}
             onOpenMobileMenu={() => setMobileMenuOpen(true)}
             onOpenMobileSettings={() => setMobileSettingsOpen(true)}
             onSearchSubmit={() => {
@@ -1086,7 +1089,10 @@ export function MarketplaceExperience() {
       />
 
       {mobileSettingsOpen ? (
-        <MarketplaceFilterPopover onClose={() => setMobileSettingsOpen(false)}>
+        <MarketplaceFilterPopover
+          anchorRef={mobileSettingsButtonRef}
+          onClose={() => setMobileSettingsOpen(false)}
+        >
           <SearchSettingsPanel
             filters={filters}
             patchFilters={patchFilters}
@@ -1442,12 +1448,63 @@ function MarketplaceMenuDrawer({
 }
 
 function MarketplaceFilterPopover({
+  anchorRef,
   onClose,
   children
 }: {
+  anchorRef?: RefObject<HTMLButtonElement | null>;
   onClose: () => void;
   children: React.ReactNode;
 }) {
+  const [position, setPosition] = useState({
+    arrowLeft: 32,
+    left: 12,
+    top: 72
+  });
+
+  useEffect(() => {
+    function updatePosition() {
+      const anchor = anchorRef?.current;
+      if (!anchor) {
+        return;
+      }
+
+      const rect = anchor.getBoundingClientRect();
+      const viewportWidth = window.innerWidth;
+      const popoverWidth = Math.min(viewportWidth * 0.92, 420);
+      const viewportMargin = 8;
+      const anchorCenter = rect.left + rect.width / 2;
+      const left = Math.min(
+        Math.max(anchorCenter - popoverWidth / 2, viewportMargin),
+        viewportWidth - popoverWidth - viewportMargin
+      );
+      const arrowLeft = Math.min(Math.max(anchorCenter - left - 8, 18), popoverWidth - 26);
+
+      setPosition({
+        arrowLeft,
+        left,
+        top: rect.bottom + 12
+      });
+    }
+
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+    window.visualViewport?.addEventListener("resize", updatePosition);
+
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+      window.visualViewport?.removeEventListener("resize", updatePosition);
+    };
+  }, [anchorRef]);
+
+  const popoverStyle = {
+    "--marketplace-filter-popover-arrow-left": `${position.arrowLeft}px`,
+    "--marketplace-filter-popover-left": `${position.left}px`,
+    "--marketplace-filter-popover-top": `${position.top}px`
+  } as CSSProperties;
+
   return (
     <div className="marketplace-filter-popover-layer" role="presentation">
       <button
@@ -1456,7 +1513,13 @@ function MarketplaceFilterPopover({
         onClick={onClose}
         aria-label="Close search filters"
       />
-      <section className="marketplace-filter-popover" role="dialog" aria-modal="false" aria-label="Search filters">
+      <section
+        className="marketplace-filter-popover"
+        role="dialog"
+        aria-modal="false"
+        aria-label="Search filters"
+        style={popoverStyle}
+      >
         <div className="marketplace-filter-popover-arrow" aria-hidden="true" />
         <div className="max-h-[min(70svh,34rem)] overflow-y-auto">{children}</div>
       </section>
@@ -1468,6 +1531,7 @@ function MarketplaceHeaderSearch({
   filters,
   patchFilters,
   searchBusy,
+  settingsButtonRef,
   onOpenMobileMenu,
   onOpenMobileSettings,
   onSearchSubmit
@@ -1475,6 +1539,7 @@ function MarketplaceHeaderSearch({
   filters: FilterState;
   patchFilters: (next: Partial<FilterState>) => void;
   searchBusy: boolean;
+  settingsButtonRef?: RefObject<HTMLButtonElement | null>;
   onOpenMobileMenu: () => void;
   onOpenMobileSettings: () => void;
   onSearchSubmit?: () => void;
@@ -1485,13 +1550,14 @@ function MarketplaceHeaderSearch({
       data-searching={searchBusy ? "true" : "false"}
     >
       <button
+        ref={settingsButtonRef}
         type="button"
-        onClick={onOpenMobileMenu}
+        onClick={onOpenMobileSettings}
         className="marketplace-header-search-button"
-        aria-label="Open marketplace menu"
-        title="Open marketplace menu"
+        aria-label="Open search settings"
+        title="Open search settings"
       >
-        <Menu className="h-5 w-5" aria-hidden="true" />
+        <SlidersHorizontal className="h-5 w-5" aria-hidden="true" />
       </button>
       <label className="sr-only" htmlFor="marketplace-header-query">Search marketplace</label>
       <input
@@ -1510,12 +1576,12 @@ function MarketplaceHeaderSearch({
       />
       <button
         type="button"
-        onClick={onOpenMobileSettings}
+        onClick={onOpenMobileMenu}
         className="marketplace-header-search-button"
-        aria-label="Open search settings"
-        title="Open search settings"
+        aria-label="Open marketplace menu"
+        title="Open marketplace menu"
       >
-        <SlidersHorizontal className="h-5 w-5" aria-hidden="true" />
+        <Menu className="h-5 w-5" aria-hidden="true" />
       </button>
     </div>
   );
@@ -1584,7 +1650,7 @@ function MarketplaceSearchSurface({
 
   return (
     <section
-      className="marketplace-search-surface rounded-[30px] bg-orbit-panel/72 p-3 text-orbit-ink backdrop-blur-xl sm:p-4"
+      className="marketplace-search-surface marketplace-search-surface--main rounded-[30px] bg-orbit-panel/72 p-3 text-orbit-ink backdrop-blur-xl sm:p-4"
       data-searching={searchBusy ? "true" : "false"}
       aria-busy={searchBusy}
     >
@@ -1705,7 +1771,7 @@ function SearchFilterControls({
         value={filters.category}
         onChange={(value) => patchFilters({ category: value })}
         options={[
-          { value: "all", label: "Category" },
+          { value: "all", label: "All Category" },
           ...marketplaceCategories.map((category) => ({ value: category.id, label: category.label }))
         ]}
       />
@@ -1714,7 +1780,7 @@ function SearchFilterControls({
         value={filters.county}
         onChange={(value) => patchFilters({ county: value })}
         options={[
-          { value: "all", label: "Location" },
+          { value: "all", label: "All Locations" },
           ...kenyaCounties.map((county) => ({ value: county, label: county }))
         ]}
       />
@@ -1723,7 +1789,7 @@ function SearchFilterControls({
         value={filters.operationMode}
         onChange={(value) => patchFilters({ operationMode: value })}
         options={[
-          { value: "all", label: "Mode" },
+          { value: "all", label: "All Modes" },
           { value: "self_operated", label: "Self-operated" },
           { value: "owner_operated", label: "Owner-operated" },
           { value: "operator_only", label: "Operator-only" }
@@ -1809,7 +1875,7 @@ function RadiusFilterPopover({ value, onChange }: { value: number; onChange: (va
         aria-expanded={open}
         aria-haspopup="dialog"
       >
-        <span className="min-w-0 flex-1 truncate">Radius {value} km</span>
+        <span className="min-w-0 flex-1 truncate">{value >= initialFilters.radiusKm ? "Full radius" : `Radius ${value} km`}</span>
         <span className="marketplace-search-filter-arrow">
           <ChevronDown className={cn("h-4 w-4 transition-transform", open ? "rotate-180" : "")} aria-hidden="true" />
         </span>

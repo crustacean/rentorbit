@@ -209,6 +209,11 @@ textarea:focus-visible {
   z-index: 30;
 }
 
+.marketplace-search-surface--main {
+  inline-size: min(clamp(46rem, 60%, 64rem), 100%);
+  margin-inline: auto;
+}
+
 .marketplace-search-input-shell {
   background: var(--marketplace-search-bg);
   border-radius: 24px;
@@ -217,16 +222,25 @@ textarea:focus-visible {
 }
 
 .marketplace-header-search {
+  --marketplace-search-bg: rgb(var(--color-orbit-field) / 0.72);
   align-items: center;
-  background: rgb(var(--color-orbit-field) / 0.72);
+  background: var(--marketplace-search-bg);
   border-radius: 999px;
   display: grid;
   gap: clamp(0.35rem, 1.2vw, 0.65rem);
   grid-template-columns: auto minmax(0, 1fr) auto;
   inline-size: 100%;
+  isolation: isolate;
   min-block-size: 0;
   min-inline-size: 0;
+  overflow: visible;
   padding: clamp(0.2rem, 0.9vw, 0.38rem);
+  position: relative;
+}
+
+.marketplace-header-search > * {
+  position: relative;
+  z-index: 1;
 }
 
 .marketplace-header-search-button,
@@ -269,6 +283,14 @@ textarea:focus-visible {
   color: rgb(var(--color-orbit-ink) / 0.42);
 }
 
+@media (max-width: 767px) {
+  .marketplace-header-search-input:focus,
+  .marketplace-header-search-input:focus-visible {
+    box-shadow: none;
+    outline: 0;
+  }
+}
+
 .marketplace-search-icon-button {
   align-items: center;
   background: rgb(var(--color-orbit-field) / 0.78);
@@ -287,28 +309,36 @@ textarea:focus-visible {
 }
 
 .marketplace-filter-row {
+  --marketplace-filter-pill-width: clamp(8.5rem, 12cqi, 10.75rem);
   align-items: stretch;
-  flex-wrap: nowrap;
-  gap: clamp(0.25rem, 0.6cqi, 0.5rem);
+  align-content: center;
+  flex-wrap: wrap;
+  gap: clamp(0.5rem, 1.1cqi, 1rem);
   inline-size: 100%;
+  justify-content: center;
   min-inline-size: 0;
   overflow: visible;
 }
 
 .marketplace-filter-row--popover {
+  --marketplace-filter-pill-width: clamp(8.25rem, 42vw, 11rem);
   flex-wrap: wrap;
+  justify-content: center;
 }
 
 .marketplace-filter-row--popover .marketplace-filter-control,
 .marketplace-filter-row--popover > .marketplace-countrywide-toggle,
 .marketplace-filter-row--popover > .marketplace-clear-filter-pill {
-  flex: 1 1 min(10rem, 100%);
+  flex: 0 0 min(var(--marketplace-filter-pill-width), 100%);
+  inline-size: min(var(--marketplace-filter-pill-width), 100%);
 }
 
 .marketplace-filter-control,
 .marketplace-filter-row > .marketplace-countrywide-toggle,
 .marketplace-filter-row > .marketplace-clear-filter-pill {
-  flex: 1 1 0;
+  flex: 0 0 min(var(--marketplace-filter-pill-width), 100%);
+  inline-size: min(var(--marketplace-filter-pill-width), 100%);
+  max-inline-size: 100%;
   min-inline-size: 0;
 }
 
@@ -458,8 +488,8 @@ textarea:focus-visible {
   border-radius: 28px;
   box-shadow: 0 24px 56px rgb(var(--color-orbit-shadow) / 0.18);
   inline-size: min(92vw, 420px);
-  inset-block-start: clamp(4rem, 13vw, 5.25rem);
-  inset-inline-end: clamp(0.5rem, 3vw, 1rem);
+  inset-block-start: var(--marketplace-filter-popover-top, clamp(4rem, 13vw, 5.25rem));
+  inset-inline-start: var(--marketplace-filter-popover-left, clamp(0.5rem, 3vw, 1rem));
   padding: clamp(0.55rem, 2.5vw, 0.9rem);
   pointer-events: auto;
   position: absolute;
@@ -472,7 +502,7 @@ textarea:focus-visible {
   box-shadow: -2px -2px 8px rgb(var(--color-orbit-shadow) / 0.04);
   inline-size: 1rem;
   inset-block-start: -0.35rem;
-  inset-inline-end: clamp(1.25rem, 8vw, 2rem);
+  inset-inline-start: var(--marketplace-filter-popover-arrow-left, clamp(1.25rem, 8vw, 2rem));
   position: absolute;
   rotate: 45deg;
 }
@@ -507,7 +537,8 @@ textarea:focus-visible {
   initial-value: 0deg;
 }
 
-.marketplace-search-surface::before {
+.marketplace-search-surface::before,
+.marketplace-header-search::before {
   --orbit-search-border-angle: 0deg;
   animation: orbit-search-border 1.4s linear infinite;
   background: conic-gradient(
@@ -534,7 +565,8 @@ textarea:focus-visible {
   mask-composite: exclude;
 }
 
-.marketplace-search-surface[data-searching="true"]::before {
+.marketplace-search-surface[data-searching="true"]::before,
+.marketplace-header-search[data-searching="true"]::before {
   opacity: 1;
 }
 
@@ -542,6 +574,10 @@ textarea:focus-visible {
   --marketplace-search-bg: rgb(47 48 52 / 0.72);
   background: var(--marketplace-search-bg);
   box-shadow: 0 18px 42px rgb(0 0 0 / 0.28);
+}
+
+:root[data-theme="dark"] .marketplace-header-search {
+  --marketplace-search-bg: rgb(47 48 52 / 0.72);
 }
 
 :root[data-theme="dark"] .marketplace-search-input-shell,
@@ -678,7 +714,8 @@ textarea:focus-visible {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .marketplace-search-surface::before {
+  .marketplace-search-surface::before,
+  .marketplace-header-search::before {
     animation: none;
   }
 }
