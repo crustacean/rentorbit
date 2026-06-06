@@ -195,6 +195,7 @@ textarea:focus-visible {
 .marketplace-search-textarea {
   field-sizing: content;
   max-block-size: 11rem;
+  min-block-size: 4rem;
   overflow-y: auto;
 }
 
@@ -217,8 +218,35 @@ textarea:focus-visible {
 .marketplace-search-input-shell {
   background: var(--marketplace-search-bg);
   border-radius: 24px;
+  display: flex;
   min-block-size: clamp(3.5rem, 6vw, 4.75rem);
   padding: clamp(0.35rem, 1vw, 0.7rem);
+}
+
+.marketplace-ai-tag-cluster {
+  border-radius: clamp(14px, 1.6cqi, 18px);
+  font-size: clamp(0.58rem, 0.72cqi, 0.66rem);
+  line-height: 1.2;
+  padding: clamp(0.38rem, 0.78cqi, 0.62rem);
+}
+
+.marketplace-ai-tags-inline {
+  align-self: stretch;
+  flex: 0 1 clamp(13rem, 32%, 22rem);
+  max-block-size: clamp(4.25rem, 6vw, 5.4rem);
+  min-inline-size: 12rem;
+  overflow-y: auto;
+}
+
+.marketplace-ai-tag-title {
+  font-size: clamp(0.46rem, 0.58cqi, 0.52rem);
+  letter-spacing: 0.045em;
+  line-height: 1.15;
+  margin-block-end: clamp(0.25rem, 0.55cqi, 0.4rem);
+}
+
+.marketplace-ai-tag-list {
+  gap: clamp(0.22rem, 0.45cqi, 0.36rem);
 }
 
 .marketplace-header-search {
@@ -782,6 +810,13 @@ textarea:focus-visible {
   cursor: not-allowed;
   filter: grayscale(1);
   opacity: 0.45;
+}
+
+.ai-filter-tag {
+  font-size: clamp(0.5rem, 0.62cqi, 0.58rem);
+  line-height: 1;
+  min-block-size: clamp(1.25rem, 1.75cqi, 1.38rem);
+  padding-inline: clamp(0.45rem, 0.82cqi, 0.62rem);
 }
 
 .ai-filter-tag[data-active="false"] {

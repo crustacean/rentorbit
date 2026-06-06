@@ -1654,7 +1654,7 @@ function MarketplaceSearchSurface({
       data-searching={searchBusy ? "true" : "false"}
       aria-busy={searchBusy}
     >
-      <div className={cn("relative z-10 grid gap-4", hasAiTags ? "xl:grid-cols-[minmax(0,1fr)_minmax(280px,34%)]" : "")}>
+      <div className="relative z-10 grid gap-4">
         <div className="grid min-w-0 gap-3">
           <div className="flex min-w-0 items-start gap-2">
             <button
@@ -1680,7 +1680,7 @@ function MarketplaceSearchSurface({
                     onSearchSubmit?.();
                   }
                 }}
-                rows={1}
+                rows={2}
                 wrap="soft"
                 enterKeyHint="search"
                 className="marketplace-search-textarea min-h-11 min-w-0 w-full resize-none bg-transparent px-1 py-2 text-[clamp(0.95rem,1.2vw,1.12rem)] font-semibold leading-6 text-orbit-ink outline-none placeholder:text-orbit-ink/45 focus:outline-none focus:ring-0 focus-visible:outline-none"
@@ -1689,6 +1689,14 @@ function MarketplaceSearchSurface({
                 aria-label="Search marketplace"
               />
             </div>
+
+            {hasAiTags ? (
+              <AiTagCluster
+                aiTags={aiTags}
+                onToggleAiTag={onToggleAiTag}
+                className="marketplace-ai-tags-inline hidden xl:block"
+              />
+            ) : null}
 
             <button
               type="button"
@@ -1709,14 +1717,6 @@ function MarketplaceSearchSurface({
             onClearFilters={onClearFilters}
           />
         </div>
-
-        {hasAiTags ? (
-          <AiTagCluster
-            aiTags={aiTags}
-            onToggleAiTag={onToggleAiTag}
-            className="hidden xl:block"
-          />
-        ) : null}
       </div>
     </section>
   );
@@ -1930,18 +1930,18 @@ function AiTagCluster({
 }) {
   if (aiTags.length === 0) {
     return (
-      <div className={cn("rounded-[24px] bg-orbit-field/45 p-4 text-sm font-bold leading-6 text-orbit-ink/58", className)}>
+      <div className={cn("marketplace-ai-tag-cluster rounded-[24px] bg-orbit-field/45 p-4 text-sm font-bold leading-6 text-orbit-ink/58", className)}>
         Search tags will appear here after AI narrows the results.
       </div>
     );
   }
 
   return (
-    <div className={cn("rounded-[24px] bg-orbit-field/45 p-4", className)}>
-      <p className="mb-3 text-xs font-black uppercase tracking-wide text-orbit-ink/55">
+    <div className={cn("marketplace-ai-tag-cluster rounded-[24px] bg-orbit-field/45 p-4", className)}>
+      <p className="marketplace-ai-tag-title mb-3 text-xs font-black uppercase tracking-wide text-orbit-ink/55">
         Click a tag to remove it from your search
       </p>
-      <div className="flex flex-wrap gap-2">
+      <div className="marketplace-ai-tag-list flex flex-wrap gap-2">
         {aiTags.map((tag) => (
           <button
             key={tag.id}
