@@ -1650,7 +1650,10 @@ function MarketplaceSearchSurface({
 
   return (
     <section
-      className="marketplace-search-surface marketplace-search-surface--main rounded-[30px] bg-orbit-panel/72 p-3 text-orbit-ink backdrop-blur-xl sm:p-4"
+      className={cn(
+        "marketplace-search-surface marketplace-search-surface--main rounded-[30px] bg-orbit-panel/72 p-3 text-orbit-ink backdrop-blur-xl sm:p-4",
+        hasAiTags && "marketplace-search-surface--with-tags"
+      )}
       data-searching={searchBusy ? "true" : "false"}
       aria-busy={searchBusy}
     >

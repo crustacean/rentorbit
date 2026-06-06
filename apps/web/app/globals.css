@@ -215,6 +215,10 @@ textarea:focus-visible {
   margin-inline: auto;
 }
 
+.marketplace-search-surface--with-tags {
+  inline-size: 100%;
+}
+
 .marketplace-search-input-shell {
   background: var(--marketplace-search-bg);
   border-radius: 24px;
@@ -232,10 +236,12 @@ textarea:focus-visible {
 
 .marketplace-ai-tags-inline {
   align-self: stretch;
-  flex: 0 1 clamp(13rem, 32%, 22rem);
-  max-block-size: clamp(4.25rem, 6vw, 5.4rem);
-  min-inline-size: 12rem;
-  overflow-y: auto;
+  flex: 0 0 auto;
+  inline-size: max-content;
+  max-block-size: none;
+  max-inline-size: none;
+  min-inline-size: max-content;
+  overflow: visible;
 }
 
 .marketplace-ai-tag-title {
@@ -247,6 +253,20 @@ textarea:focus-visible {
 
 .marketplace-ai-tag-list {
   gap: clamp(0.22rem, 0.45cqi, 0.36rem);
+}
+
+.marketplace-ai-tags-inline .marketplace-ai-tag-title {
+  display: none;
+}
+
+.marketplace-ai-tags-inline .marketplace-ai-tag-list {
+  flex-wrap: nowrap;
+  overflow: visible;
+  white-space: nowrap;
+}
+
+.marketplace-ai-tags-inline .ai-filter-tag {
+  flex: 0 0 auto;
 }
 
 .marketplace-header-search {
