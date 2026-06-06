@@ -6,16 +6,17 @@ import {
   ChevronRight,
   Compass,
   FileSignature,
-  Filter,
   Flame,
   Handshake,
   Heart,
   MapPin,
+  Menu,
   MessageCircle,
   PackageCheck,
   RotateCcw,
   Search,
   SearchX,
+  SlidersHorizontal,
   Star,
   Truck,
   UserRoundCheck,
@@ -54,18 +55,6 @@ import {
 } from "@rentorbit/shared";
 import { seededListings } from "@rentorbit/shared/sample-data";
 import { useEffect, useMemo, useRef, useState } from "react";
-
-const DateInput = dynamic(
-  () => import("@/components/MarketplaceDateInput").then((module) => module.DateInput),
-  {
-    loading: () => (
-      <div className="grid gap-1">
-        <span className="h-4 w-16 rounded-full bg-orbit-soft/70" />
-        <span className="h-10 rounded-[18px] bg-orbit-panel shadow-[inset_0_0_0_1px_rgb(255_255_255_/_0.22)]" />
-      </div>
-    )
-  }
-);
 
 const FocusedListingOverlay = dynamic(
   () => import("@/components/MarketplaceFocusedOverlay").then((module) => module.FocusedListingOverlay),
@@ -110,7 +99,7 @@ type ChatLine = {
   text: string;
 };
 
-type MobilePanel = "discovery" | "metrics" | "details";
+type MobilePanel = "details";
 type FocusedPanel = "details" | "chat";
 type SearchStatus = "idle" | "pending" | "complete";
 
@@ -481,6 +470,8 @@ export function MarketplaceExperience() {
   const [signatureName, setSignatureName] = useState("Brian Otieno");
   const [ownerSignatureName, setOwnerSignatureName] = useState("Asha Njeri");
   const [mobilePanel, setMobilePanel] = useState<MobilePanel | null>(null);
+  const [mobileSettingsOpen, setMobileSettingsOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [focusedListingId, setFocusedListingId] = useState<string | null>(null);
   const [focusedImageIndex, setFocusedImageIndex] = useState(0);
   const [focusedZoom, setFocusedZoom] = useState(1);
@@ -498,7 +489,6 @@ export function MarketplaceExperience() {
   const [aiTagsCleared, setAiTagsCleared] = useState(false);
   const [searchStatus, setSearchStatus] = useState<SearchStatus>("idle");
   const searchRequestIdRef = useRef(0);
-  const closeDiscoveryAfterSearchRef = useRef(false);
 
   useEffect(() => {
     const existingIntelligenceSession = readSearchIntelligenceSession();
@@ -569,6 +559,27 @@ export function MarketplaceExperience() {
       window.removeEventListener("keydown", handleKeyDown);
     };
   }, [mobilePanel]);
+
+  useEffect(() => {
+    if (!mobileSettingsOpen && !mobileMenuOpen) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setMobileSettingsOpen(false);
+        setMobileMenuOpen(false);
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [mobileMenuOpen, mobileSettingsOpen]);
 
   useEffect(() => {
     if (!focusedListingId) return;
@@ -667,15 +678,6 @@ export function MarketplaceExperience() {
 
     return () => window.clearTimeout(timer);
   }, [aiTagsCleared, filters]);
-
-  useEffect(() => {
-    if (searchStatus !== "complete" || !closeDiscoveryAfterSearchRef.current) {
-      return;
-    }
-
-    closeDiscoveryAfterSearchRef.current = false;
-    setMobilePanel((current) => (current === "discovery" ? null : current));
-  }, [searchStatus]);
 
   const popularResults = useMemo(() => {
     const activeListings = seededListings
@@ -787,10 +789,6 @@ export function MarketplaceExperience() {
   const searchBusy = searchStatus === "pending";
 
   function patchFilters(next: Partial<FilterState>) {
-    if (mobilePanel === "discovery" && typeof next.query === "string" && next.query.trim()) {
-      closeDiscoveryAfterSearchRef.current = true;
-    }
-
     setFilters((current) => normalizeFilterWindow(current, next));
   }
 
@@ -1040,25 +1038,8 @@ export function MarketplaceExperience() {
     <main className="min-h-screen overflow-x-hidden bg-orbit-field">
       <SiteHeader active="rent" />
 
-      <MobilePanelBar onOpen={setMobilePanel} />
-
       {mobilePanel ? (
-        <MobilePanelOverlay title={panelTitle(mobilePanel)} onClose={() => setMobilePanel(null)}>
-          {mobilePanel === "discovery" ? (
-            <DiscoveryPanel
-              filters={filters}
-              patchFilters={patchFilters}
-              aiTags={visibleAiTags}
-              searchBusy={searchBusy}
-              onToggleAiTag={toggleAiTag}
-              onResetAiTags={resetAiTags}
-              onSearchSubmit={() => {
-                closeDiscoveryAfterSearchRef.current = false;
-                setMobilePanel(null);
-              }}
-            />
-          ) : null}
-          {mobilePanel === "metrics" ? <MarketplaceSummaryPanel resultsLength={results.length} searchBusy={searchBusy} /> : null}
+        <MobilePanelOverlay title={panelTitle()} onClose={() => setMobilePanel(null)}>
           {mobilePanel === "details" ? (
             <ListingDetailsPanel
               selectedListing={selectedListing}
@@ -1079,20 +1060,43 @@ export function MarketplaceExperience() {
         </MobilePanelOverlay>
       ) : null}
 
-      <div className="grid min-h-[calc(100svh-81px)] min-w-0 w-full gap-3 px-3 py-3 xl:h-[calc(100svh-81px)] xl:grid-cols-[280px_minmax(0,1fr)_360px] xl:overflow-hidden 2xl:grid-cols-[300px_minmax(0,1fr)_380px]">
-        <aside className="viewport-scroll-column hidden min-w-0 self-start xl:sticky xl:top-0 xl:block">
-          <DiscoveryPanel
+      {mobileSettingsOpen ? (
+        <MobilePanelOverlay title="Search settings" onClose={() => setMobileSettingsOpen(false)}>
+          <SearchSettingsPanel
+            filters={filters}
+            patchFilters={patchFilters}
+            aiTags={visibleAiTags}
+            onToggleAiTag={toggleAiTag}
+            onClearFilters={() => {
+              clearFilters();
+              setMobileSettingsOpen(false);
+            }}
+          />
+        </MobilePanelOverlay>
+      ) : null}
+
+      {mobileMenuOpen ? (
+        <MobilePanelOverlay title="RentOrbit" onClose={() => setMobileMenuOpen(false)}>
+          <MarketplaceMobileMenu onClose={() => setMobileMenuOpen(false)} />
+        </MobilePanelOverlay>
+      ) : null}
+
+      <div className="grid min-h-[calc(100svh-81px)] min-w-0 w-full gap-3 px-3 py-3 xl:h-[calc(100svh-81px)] xl:grid-cols-[minmax(0,1fr)_360px] xl:overflow-hidden 2xl:grid-cols-[minmax(0,1fr)_380px]">
+        <section className="viewport-scroll-column grid min-w-0 content-start gap-3 xl:pr-1">
+          <MarketplaceSearchSurface
             filters={filters}
             patchFilters={patchFilters}
             aiTags={visibleAiTags}
             searchBusy={searchBusy}
             onToggleAiTag={toggleAiTag}
-            onResetAiTags={resetAiTags}
+            onClearFilters={clearFilters}
+            onSearchSubmit={() => {
+              setMobileSettingsOpen(false);
+            }}
+            onOpenMobileSettings={() => setMobileSettingsOpen(true)}
+            onOpenMobileMenu={() => setMobileMenuOpen(true)}
+            onOpenMobileDetails={() => setMobilePanel("details")}
           />
-        </aside>
-
-        <section className="viewport-scroll-column grid min-w-0 content-start gap-3 xl:pr-1">
-          <MarketplaceSummaryPanel resultsLength={results.length} searchBusy={searchBusy} className="hidden xl:grid" />
 
           <div className="grid gap-3">
             <div className="rounded-[30px] bg-orbit-panel/35 p-3">
@@ -1377,41 +1381,8 @@ function EmptyRecommendationCard({
   );
 }
 
-function panelTitle(panel: MobilePanel): string {
-  if (panel === "discovery") return "Discovery";
-  if (panel === "metrics") return "Countrywide Metrics";
+function panelTitle(): string {
   return "More Details";
-}
-
-function MobilePanelBar({ onOpen }: { onOpen: (panel: MobilePanel) => void }) {
-  return (
-    <div className="theme-body-border sticky top-0 z-40 grid grid-cols-3 gap-2 border-b border-white/70 bg-orbit-field/95 px-3 py-2 backdrop-blur xl:hidden">
-      <button
-        type="button"
-        onClick={() => onOpen("discovery")}
-        className="mobile-panel-button theme-body-border inline-flex items-center justify-center rounded-full bg-orbit-panel/92 font-black text-orbit-ink ring-1 ring-white/70"
-      >
-        <Filter className="text-orbit-green" aria-hidden="true" />
-        Discovery
-      </button>
-      <button
-        type="button"
-        onClick={() => onOpen("metrics")}
-        className="mobile-panel-button theme-body-border inline-flex items-center justify-center rounded-full bg-orbit-panel/92 font-black text-orbit-ink ring-1 ring-white/70"
-      >
-        <MapPin className="text-orbit-green" aria-hidden="true" />
-        Metrics
-      </button>
-      <button
-        type="button"
-        onClick={() => onOpen("details")}
-        className="mobile-panel-button theme-body-border inline-flex items-center justify-center rounded-full bg-orbit-panel/92 font-black text-orbit-ink ring-1 ring-white/70"
-      >
-        <PackageCheck className="text-orbit-green" aria-hidden="true" />
-        Details
-      </button>
-    </div>
-  );
 }
 
 function MobilePanelOverlay({
@@ -1441,24 +1412,57 @@ function MobilePanelOverlay({
   );
 }
 
-function DiscoveryPanel({
+function MarketplaceMobileMenu({ onClose }: { onClose: () => void }) {
+  const links = [
+    { href: "/", label: "Home" },
+    { href: "/marketplace", label: "Rent" },
+    { href: "/account?mode=signup", label: "List Your Item" },
+    { href: "/account", label: "Account" }
+  ];
+
+  return (
+    <nav className="grid gap-3" aria-label="Marketplace menu">
+      {links.map((link) => (
+        <Link
+          key={link.href}
+          href={link.href}
+          prefetch={false}
+          onClick={onClose}
+          className="theme-body-border flex min-h-14 items-center justify-between rounded-full bg-orbit-panel px-5 text-sm font-black text-orbit-ink ring-1 ring-white/70"
+        >
+          {link.label}
+          <ArrowUpRight className="h-4 w-4 text-[#806A00]" aria-hidden="true" />
+        </Link>
+      ))}
+    </nav>
+  );
+}
+
+function MarketplaceSearchSurface({
   filters,
   patchFilters,
   aiTags,
   searchBusy,
   onToggleAiTag,
-  onResetAiTags,
-  onSearchSubmit
+  onClearFilters,
+  onSearchSubmit,
+  onOpenMobileSettings,
+  onOpenMobileMenu,
+  onOpenMobileDetails
 }: {
   filters: FilterState;
   patchFilters: (next: Partial<FilterState>) => void;
   aiTags: AiTagState[];
   searchBusy: boolean;
   onToggleAiTag: (tagId: string) => void;
-  onResetAiTags: () => void;
+  onClearFilters: () => void;
   onSearchSubmit?: () => void;
+  onOpenMobileSettings: () => void;
+  onOpenMobileMenu: () => void;
+  onOpenMobileDetails: () => void;
 }) {
   const queryTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const hasAiTags = aiTags.length > 0;
 
   useEffect(() => {
     const textarea = queryTextareaRef.current;
@@ -1471,169 +1475,323 @@ function DiscoveryPanel({
   }, [filters.query]);
 
   return (
-    <section className={cn(ui.surface, "overflow-x-hidden p-5")}>
-      <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-base font-bold">Discovery</h2>
-        <button className="rounded-full bg-orbit-field p-2 text-orbit-green" title="Filter listings">
-          <Filter className="h-4 w-4" aria-hidden="true" />
-        </button>
-      </div>
+    <section
+      className="marketplace-search-surface rounded-[30px] bg-orbit-panel/72 p-3 text-orbit-ink backdrop-blur-xl sm:p-4"
+      data-searching={searchBusy ? "true" : "false"}
+      aria-busy={searchBusy}
+    >
+      <div className={cn("relative z-10 grid gap-4", hasAiTags ? "xl:grid-cols-[minmax(0,1fr)_minmax(280px,34%)]" : "")}>
+        <div className="grid min-w-0 gap-3">
+          <div className="flex min-w-0 items-start gap-2">
+            <button
+              type="button"
+              onClick={onOpenMobileMenu}
+              className="marketplace-search-icon-button xl:hidden"
+              aria-label="Open marketplace menu"
+              title="Open marketplace menu"
+            >
+              <Menu className="h-5 w-5" aria-hidden="true" />
+            </button>
 
-      <label className="mb-3 block">
-        <span className="mb-1 block text-xs font-semibold uppercase text-neutral-500">Search</span>
-        <div
-          className={cn(ui.searchShell, "marketplace-search-shell min-h-14 items-start rounded-[16px]")}
-          data-searching={searchBusy ? "true" : "false"}
-          aria-busy={searchBusy}
-        >
-          <textarea
-            ref={queryTextareaRef}
-            value={filters.query}
-            onChange={(event) => patchFilters({ query: event.target.value })}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" && !event.shiftKey) {
-                event.preventDefault();
-                onSearchSubmit?.();
-              }
-            }}
-            rows={1}
-            wrap="soft"
-            enterKeyHint="search"
-            className="marketplace-search-textarea min-h-10 min-w-0 flex-1 resize-none bg-transparent px-2 py-2 text-sm font-semibold leading-5 text-orbit-ink outline-none placeholder:text-orbit-ink/45 focus:outline-none focus:ring-0 focus-visible:outline-none"
-            style={{ outline: "none" }}
-            placeholder="camera, crew, generator"
-            aria-label="Search marketplace"
-          />
-        </div>
-      </label>
-
-      {aiTags.length > 0 ? (
-        <div className="mb-4">
-          <p className="mb-3 text-xs font-black uppercase tracking-wide text-neutral-500">
-            Click a tag to remove it from your search
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {aiTags.map((tag) => (
-              <button
-                key={tag.id}
-                type="button"
-                onClick={() => onToggleAiTag(tag.id)}
-                className="ai-filter-tag inline-flex min-h-10 items-center rounded-full px-4 text-xs font-black transition-colors focus-visible:outline-none"
-                data-active={tag.active ? "true" : "false"}
-                style={
-                  tag.active
-                    ? {
-                        backgroundColor: tag.color,
-                        color: tag.textColor
-                      }
-                    : undefined
-                }
-                title={tag.active ? `Remove ${tag.label} from this search` : `Add ${tag.label} back to this search`}
-              >
-                {tag.label}
-              </button>
-            ))}
+            <div className="marketplace-search-input-shell min-w-0 flex-1">
+              <label className="sr-only" htmlFor="marketplace-search-query">Search marketplace</label>
+              <div className="flex min-w-0 items-start gap-2">
+                <textarea
+                  id="marketplace-search-query"
+                  ref={queryTextareaRef}
+                  value={filters.query}
+                  onChange={(event) => patchFilters({ query: event.target.value })}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" && !event.shiftKey) {
+                      event.preventDefault();
+                      onSearchSubmit?.();
+                    }
+                  }}
+                  rows={1}
+                  wrap="soft"
+                  enterKeyHint="search"
+                  className="marketplace-search-textarea min-h-11 min-w-0 flex-1 resize-none bg-transparent px-1 py-2 text-[clamp(0.95rem,1.2vw,1.12rem)] font-semibold leading-6 text-orbit-ink outline-none placeholder:text-orbit-ink/45 focus:outline-none focus:ring-0 focus-visible:outline-none"
+                  style={{ outline: "none" }}
+                  placeholder="Suggest a camera under KES 15000 near me with a crew..."
+                  aria-label="Search marketplace"
+                />
+                <button
+                  type="button"
+                  onClick={onOpenMobileSettings}
+                  className="marketplace-search-icon-button xl:hidden"
+                  aria-label="Open search settings"
+                  title="Open search settings"
+                >
+                  <SlidersHorizontal className="h-5 w-5" aria-hidden="true" />
+                </button>
+              </div>
+            </div>
           </div>
-          <button
-            type="button"
-            onClick={onResetAiTags}
-            className={cn(ui.goldPill, "mt-4 min-h-12 w-full rounded-[14px] px-4 text-sm shadow-[0_12px_24px_rgba(239,191,4,0.18)]")}
-          >
-            <RotateCcw className="h-5 w-5" aria-hidden="true" />
-            Reset AI Filters
-          </button>
+
+          <SearchFilterControls
+            filters={filters}
+            patchFilters={patchFilters}
+            className="hidden flex-wrap gap-2 xl:flex"
+          />
+
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={onClearFilters}
+              className="marketplace-clear-filter-pill"
+            >
+              <RotateCcw className="h-4 w-4" aria-hidden="true" />
+              Clear filters
+            </button>
+            <button
+              type="button"
+              onClick={onOpenMobileDetails}
+              className="marketplace-mobile-details-pill xl:hidden"
+            >
+              <PackageCheck className="h-4 w-4" aria-hidden="true" />
+              Details
+            </button>
+          </div>
         </div>
-      ) : null}
 
-      <div className="grid gap-3">
-        <FilterSelect
-          label="Category"
-          value={filters.category}
-          onChange={(value) => patchFilters({ category: value })}
-          options={[
-            { value: "all", label: "All categories" },
-            ...marketplaceCategories.map((category) => ({ value: category.id, label: category.label }))
-          ]}
-        />
-
-        <FilterSelect
-          label="County"
-          value={filters.county}
-          onChange={(value) => patchFilters({ county: value })}
-          options={[
-            { value: "all", label: "All Kenya" },
-            ...kenyaCounties.map((county) => ({ value: county, label: county }))
-          ]}
-        />
-
-        <FilterSelect
-          label="Mode"
-          value={filters.operationMode}
-          onChange={(value) => patchFilters({ operationMode: value })}
-          options={[
-            { value: "all", label: "Any mode" },
-            { value: "self_operated", label: "Self-operated" },
-            { value: "owner_operated", label: "Owner-operated" },
-            { value: "operator_only", label: "Operator-only" }
-          ]}
-        />
-
-        <label className="block rounded-[18px] bg-orbit-field px-3 py-2 shadow-[inset_0_0_0_1px_rgb(255_255_255_/_0.18)]">
-          <span className="mb-1 block text-xs font-semibold uppercase text-neutral-500">Radius</span>
-          <input
-            type="range"
-            min="5"
-            max="300"
-            step="5"
-            value={filters.radiusKm}
-            onChange={(event) => patchFilters({ radiusKm: Number(event.target.value) })}
-            className="w-full accent-orbit-green"
+        {hasAiTags ? (
+          <AiTagCluster
+            aiTags={aiTags}
+            onToggleAiTag={onToggleAiTag}
+            className="hidden xl:block"
           />
-          <span className="text-sm font-semibold">{filters.radiusKm} km</span>
-        </label>
-
-        <label className="flex items-center gap-3 rounded-[18px] bg-orbit-field px-3 py-2 text-sm shadow-[inset_0_0_0_1px_rgb(255_255_255_/_0.18)]">
-          <input
-            type="checkbox"
-            checked={filters.includeCountrywide}
-            onChange={(event) => patchFilters({ includeCountrywide: event.target.checked })}
-            className="h-4 w-4 accent-orbit-green"
-          />
-          Countrywide delivery
-        </label>
-
-        <DateInput label="Start" value={filters.start} onChange={(value) => patchFilters({ start: value })} />
-        <DateInput label="End" value={filters.end} onChange={(value) => patchFilters({ end: value })} />
+        ) : null}
       </div>
     </section>
   );
 }
 
-function MarketplaceSummaryPanel({
-  resultsLength,
-  searchBusy = false,
-  className = "grid"
+function SearchSettingsPanel({
+  filters,
+  patchFilters,
+  aiTags,
+  onToggleAiTag,
+  onClearFilters
 }: {
-  resultsLength: number;
-  searchBusy?: boolean;
+  filters: FilterState;
+  patchFilters: (next: Partial<FilterState>) => void;
+  aiTags: AiTagState[];
+  onToggleAiTag: (tagId: string) => void;
+  onClearFilters: () => void;
+}) {
+  return (
+    <section className={cn(ui.surface, "grid gap-4 overflow-visible p-4")}>
+      <SearchFilterControls filters={filters} patchFilters={patchFilters} className="flex flex-wrap gap-2" />
+      <AiTagCluster aiTags={aiTags} onToggleAiTag={onToggleAiTag} />
+      <button type="button" onClick={onClearFilters} className="marketplace-clear-filter-pill justify-center">
+        <RotateCcw className="h-4 w-4" aria-hidden="true" />
+        Clear filters
+      </button>
+    </section>
+  );
+}
+
+function SearchFilterControls({
+  filters,
+  patchFilters,
+  className
+}: {
+  filters: FilterState;
+  patchFilters: (next: Partial<FilterState>) => void;
   className?: string;
 }) {
   return (
-    <div className={cn(ui.surface, className, "gap-3 p-5 lg:grid-cols-[1fr_280px]")}>
-      <div>
-        <div className="flex items-center gap-2 text-sm font-bold text-orbit-green">
-          <Search className="h-4 w-4" aria-hidden="true" />
-          AI Recommended listings
+    <div className={className}>
+      <SearchFilterPill
+        label="Category"
+        value={filters.category}
+        onChange={(value) => patchFilters({ category: value })}
+        options={[
+          { value: "all", label: "Category" },
+          ...marketplaceCategories.map((category) => ({ value: category.id, label: category.label }))
+        ]}
+      />
+      <SearchFilterPill
+        label="Location"
+        value={filters.county}
+        onChange={(value) => patchFilters({ county: value })}
+        options={[
+          { value: "all", label: "Location" },
+          ...kenyaCounties.map((county) => ({ value: county, label: county }))
+        ]}
+      />
+      <SearchFilterPill
+        label="Mode"
+        value={filters.operationMode}
+        onChange={(value) => patchFilters({ operationMode: value })}
+        options={[
+          { value: "all", label: "Mode" },
+          { value: "self_operated", label: "Self-operated" },
+          { value: "owner_operated", label: "Owner-operated" },
+          { value: "operator_only", label: "Operator-only" }
+        ]}
+      />
+      <RadiusFilterPopover value={filters.radiusKm} onChange={(value) => patchFilters({ radiusKm: value })} />
+      <CountrywideDeliveryToggle
+        checked={filters.includeCountrywide}
+        onChange={(checked) => patchFilters({ includeCountrywide: checked })}
+      />
+    </div>
+  );
+}
+
+function SearchFilterPill({
+  label,
+  value,
+  onChange,
+  options
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: CustomSelectOption[];
+}) {
+  return (
+    <CustomSelect
+      label={label}
+      value={value}
+      onChange={onChange}
+      options={options}
+      className="relative min-w-[clamp(8rem,12vw,11rem)]"
+      labelClassName="sr-only"
+      buttonClassName="marketplace-search-filter-pill"
+      arrowClassName="marketplace-search-filter-arrow"
+      menuClassName="absolute left-0 top-[calc(100%+8px)] z-[70] min-w-full overflow-hidden rounded-[24px] bg-orbit-panel p-2 shadow-[0_18px_42px_rgba(25,32,29,0.14)]"
+    />
+  );
+}
+
+function RadiusFilterPopover({ value, onChange }: { value: number; onChange: (value: number) => void }) {
+  const [open, setOpen] = useState(false);
+  const wrapperRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    function handlePointerDown(event: PointerEvent) {
+      if (!wrapperRef.current?.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setOpen(false);
+      }
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [open]);
+
+  return (
+    <div ref={wrapperRef} className="relative min-w-[clamp(8rem,12vw,11rem)]">
+      <button
+        type="button"
+        onClick={() => setOpen((current) => !current)}
+        className="marketplace-search-filter-pill"
+        aria-expanded={open}
+        aria-haspopup="dialog"
+      >
+        <span className="min-w-0 flex-1 truncate">Radius {value} km</span>
+        <span className="marketplace-search-filter-arrow">
+          <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
+        </span>
+      </button>
+      {open ? (
+        <div className="absolute left-0 top-[calc(100%+8px)] z-[70] w-[min(18rem,calc(100vw-2rem))] rounded-[24px] bg-orbit-panel p-4 shadow-[0_18px_42px_rgba(25,32,29,0.14)]">
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-xs font-black uppercase tracking-[0.08em] text-orbit-ink/58">Radius</span>
+            <span className="text-sm font-black text-orbit-ink">{value} km</span>
+          </div>
+          <input
+            type="range"
+            min="5"
+            max="300"
+            step="5"
+            value={value}
+            onChange={(event) => onChange(Number(event.target.value))}
+            className="mt-4 w-full accent-[#806A00]"
+          />
+          <div className="mt-2 flex justify-between text-[10px] font-black uppercase text-orbit-ink/45">
+            <span>5 km</span>
+            <span>300 km</span>
+          </div>
         </div>
-        <h2 className="mt-2 text-2xl font-black text-orbit-ink">All category availability</h2>
-        <p className="mt-1 max-w-3xl text-sm leading-6 text-neutral-600">
-          {searchBusy ? "Searching matching resources across goods, services, and personnel." : `${resultsLength} matching resources across goods, services, and personnel.`}
-        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function CountrywideDeliveryToggle({ checked, onChange }: { checked: boolean; onChange: (checked: boolean) => void }) {
+  return (
+    <button
+      type="button"
+      onClick={() => onChange(!checked)}
+      className="marketplace-countrywide-toggle"
+      aria-pressed={checked}
+    >
+      <span className="marketplace-countrywide-thumb" aria-hidden="true" />
+      Countrywide
+    </button>
+  );
+}
+
+function AiTagCluster({
+  aiTags,
+  onToggleAiTag,
+  className
+}: {
+  aiTags: AiTagState[];
+  onToggleAiTag: (tagId: string) => void;
+  className?: string;
+}) {
+  if (aiTags.length === 0) {
+    return (
+      <div className={cn("rounded-[24px] bg-orbit-field/45 p-4 text-sm font-bold leading-6 text-orbit-ink/58", className)}>
+        Search tags will appear here after AI narrows the results.
       </div>
-      <div className="grid grid-cols-3 gap-2 text-center text-xs">
-        <Metric label="Searches" value="1.8k" tone="yellow" />
-        <Metric label="Signed" value="64%" tone="green" />
-        <Metric label="Disputes" value="2.1%" tone="red" />
+    );
+  }
+
+  return (
+    <div className={cn("rounded-[24px] bg-orbit-field/45 p-4", className)}>
+      <p className="mb-3 text-xs font-black uppercase tracking-wide text-orbit-ink/55">
+        Click a tag to remove it from your search
+      </p>
+      <div className="flex flex-wrap gap-2">
+        {aiTags.map((tag) => (
+          <button
+            key={tag.id}
+            type="button"
+            onClick={() => onToggleAiTag(tag.id)}
+            className="ai-filter-tag inline-flex min-h-9 items-center rounded-full px-4 text-xs font-black transition-colors focus-visible:outline-none"
+            data-active={tag.active ? "true" : "false"}
+            style={
+              tag.active
+                ? {
+                    backgroundColor: tag.color,
+                    color: tag.textColor
+                  }
+                : undefined
+            }
+            title={tag.active ? `Remove ${tag.label} from this search` : `Add ${tag.label} back to this search`}
+          >
+            {tag.label}
+          </button>
+        ))}
       </div>
     </div>
   );
@@ -1933,29 +2091,6 @@ function normalizeFilterWindow(current: FilterState, next: Partial<FilterState>)
   return { ...merged, end: formatDateTimeValue(adjustedEnd) };
 }
 
-function FilterSelect({
-  label,
-  value,
-  onChange,
-  options
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  options: CustomSelectOption[];
-}) {
-  return (
-    <CustomSelect
-      label={label}
-      value={value}
-      onChange={onChange}
-      options={options}
-      labelClassName="mb-1 block text-xs font-semibold uppercase text-neutral-500"
-      buttonClassName="flex min-h-10 w-full items-center gap-3 rounded-[18px] bg-orbit-panel py-2 pl-3 pr-2 text-left text-sm text-orbit-ink outline-none shadow-[inset_0_0_0_1px_rgb(255_255_255_/_0.22)] transition hover:bg-orbit-soft/45 focus:outline-none focus:ring-0 focus-visible:outline-none"
-    />
-  );
-}
-
 function MarketplaceListingCard({
   result,
   selected,
@@ -2096,20 +2231,6 @@ function SearchProgressState() {
           </p>
         </div>
       </div>
-    </div>
-  );
-}
-
-function Metric({ label, value, tone }: { label: string; value: string; tone: "yellow" | "green" | "red" }) {
-  const tones = {
-    yellow: "text-[#FFBD2E]",
-    green: "text-[#28C840]",
-    red: "text-[#FF5F57]"
-  };
-  return (
-    <div className="rounded-[18px] border border-orbit-line bg-orbit-field p-2">
-      <p className={`text-lg font-black ${tones[tone]}`}>{value}</p>
-      <p className="mt-1 font-semibold text-neutral-600">{label}</p>
     </div>
   );
 }
