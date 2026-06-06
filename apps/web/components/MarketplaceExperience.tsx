@@ -3,6 +3,7 @@
 import {
   ArrowUpRight,
   CalendarClock,
+  ChevronDown,
   ChevronRight,
   Compass,
   FileSignature,
@@ -99,7 +100,6 @@ type ChatLine = {
   text: string;
 };
 
-type MobilePanel = "details";
 type FocusedPanel = "details" | "chat";
 type SearchStatus = "idle" | "pending" | "complete";
 
@@ -153,6 +153,18 @@ const initialFilters: FilterState = {
   start: "2026-06-16T09:00",
   end: "2026-06-17T09:00"
 };
+
+function hasMarketplaceSearchChanges(filters: FilterState, aiTags: AiTagState[]): boolean {
+  return (
+    filters.query.trim().length > 0 ||
+    filters.category !== initialFilters.category ||
+    filters.county !== initialFilters.county ||
+    filters.radiusKm !== initialFilters.radiusKm ||
+    filters.operationMode !== initialFilters.operationMode ||
+    filters.includeCountrywide !== initialFilters.includeCountrywide ||
+    aiTags.length > 0
+  );
+}
 
 function kes(amount: number): string {
   return new Intl.NumberFormat("en-KE", {
@@ -469,7 +481,6 @@ export function MarketplaceExperience() {
   const [contract, setContract] = useState<ContractSummary | null>(null);
   const [signatureName, setSignatureName] = useState("Brian Otieno");
   const [ownerSignatureName, setOwnerSignatureName] = useState("Asha Njeri");
-  const [mobilePanel, setMobilePanel] = useState<MobilePanel | null>(null);
   const [mobileSettingsOpen, setMobileSettingsOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [focusedListingId, setFocusedListingId] = useState<string | null>(null);
@@ -488,6 +499,8 @@ export function MarketplaceExperience() {
   const [aiTagStates, setAiTagStates] = useState<Record<string, AiTagState>>({});
   const [aiTagsCleared, setAiTagsCleared] = useState(false);
   const [searchStatus, setSearchStatus] = useState<SearchStatus>("idle");
+  const [compactSearchVisible, setCompactSearchVisible] = useState(false);
+  const marketplaceContentRef = useRef<HTMLElement | null>(null);
   const searchRequestIdRef = useRef(0);
 
   useEffect(() => {
@@ -541,26 +554,6 @@ export function MarketplaceExperience() {
   }, []);
 
   useEffect(() => {
-    if (!mobilePanel) return;
-
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        setMobilePanel(null);
-      }
-    }
-
-    window.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [mobilePanel]);
-
-  useEffect(() => {
     if (!mobileSettingsOpen && !mobileMenuOpen) return;
 
     const previousOverflow = document.body.style.overflow;
@@ -580,6 +573,25 @@ export function MarketplaceExperience() {
       window.removeEventListener("keydown", handleKeyDown);
     };
   }, [mobileMenuOpen, mobileSettingsOpen]);
+
+  useEffect(() => {
+    const currentScroller = marketplaceContentRef.current;
+    if (currentScroller === null) {
+      return;
+    }
+    const scroller: HTMLElement = currentScroller;
+
+    function updateCompactSearch() {
+      setCompactSearchVisible(scroller.scrollTop > 36);
+    }
+
+    updateCompactSearch();
+    scroller.addEventListener("scroll", updateCompactSearch, { passive: true });
+
+    return () => {
+      scroller.removeEventListener("scroll", updateCompactSearch);
+    };
+  }, []);
 
   useEffect(() => {
     if (!focusedListingId) return;
@@ -1037,28 +1049,17 @@ export function MarketplaceExperience() {
   return (
     <main className="min-h-screen overflow-x-hidden bg-orbit-field">
       <SiteHeader active="rent" />
-
-      {mobilePanel ? (
-        <MobilePanelOverlay title={panelTitle()} onClose={() => setMobilePanel(null)}>
-          {mobilePanel === "details" ? (
-            <ListingDetailsPanel
-              selectedListing={selectedListing}
-              selectedPublicCoordinates={selectedPublicCoordinates}
-              activeMode={activeMode}
-              quote={quote}
-              bookingQuantity={bookingQuantity}
-              setBookingQuantity={setBookingQuantity}
-              selectedQuantity={selectedQuantity}
-              totalUnits={selectedTotalUnits}
-              bookedUnits={selectedBookedUnits}
-              availableUnits={selectedAvailableUnits}
-              setSelectedMode={setSelectedMode}
-              onDm={requestDmForListing}
-              proposeBooking={proposeBooking}
-            />
-          ) : null}
-        </MobilePanelOverlay>
-      ) : null}
+      <MarketplaceCompactSearchBar
+        visible={compactSearchVisible}
+        filters={filters}
+        patchFilters={patchFilters}
+        searchBusy={searchBusy}
+        onOpenMobileMenu={() => setMobileMenuOpen(true)}
+        onOpenMobileSettings={() => setMobileSettingsOpen(true)}
+        onSearchSubmit={() => {
+          setMobileSettingsOpen(false);
+        }}
+      />
 
       {mobileSettingsOpen ? (
         <MobilePanelOverlay title="Search settings" onClose={() => setMobileSettingsOpen(false)}>
@@ -1082,7 +1083,7 @@ export function MarketplaceExperience() {
       ) : null}
 
       <div className="grid min-h-[calc(100svh-81px)] min-w-0 w-full gap-3 px-3 py-3 xl:h-[calc(100svh-81px)] xl:grid-cols-[minmax(0,1fr)_360px] xl:overflow-hidden 2xl:grid-cols-[minmax(0,1fr)_380px]">
-        <section className="viewport-scroll-column grid min-w-0 content-start gap-3 xl:pr-1">
+        <section ref={marketplaceContentRef} className="viewport-scroll-column grid min-w-0 content-start gap-3 xl:pr-1">
           <MarketplaceSearchSurface
             filters={filters}
             patchFilters={patchFilters}
@@ -1095,7 +1096,6 @@ export function MarketplaceExperience() {
             }}
             onOpenMobileSettings={() => setMobileSettingsOpen(true)}
             onOpenMobileMenu={() => setMobileMenuOpen(true)}
-            onOpenMobileDetails={() => setMobilePanel("details")}
           />
 
           <div className="grid gap-3">
@@ -1381,10 +1381,6 @@ function EmptyRecommendationCard({
   );
 }
 
-function panelTitle(): string {
-  return "More Details";
-}
-
 function MobilePanelOverlay({
   title,
   onClose,
@@ -1408,6 +1404,70 @@ function MobilePanelOverlay({
         </button>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto p-3">{children}</div>
+    </div>
+  );
+}
+
+function MarketplaceCompactSearchBar({
+  visible,
+  filters,
+  patchFilters,
+  searchBusy,
+  onOpenMobileMenu,
+  onOpenMobileSettings,
+  onSearchSubmit
+}: {
+  visible: boolean;
+  filters: FilterState;
+  patchFilters: (next: Partial<FilterState>) => void;
+  searchBusy: boolean;
+  onOpenMobileMenu: () => void;
+  onOpenMobileSettings: () => void;
+  onSearchSubmit?: () => void;
+}) {
+  return (
+    <div
+      className="marketplace-compact-search-bar"
+      data-visible={visible ? "true" : "false"}
+      data-searching={searchBusy ? "true" : "false"}
+      aria-hidden={!visible}
+    >
+      <button
+        type="button"
+        onClick={onOpenMobileMenu}
+        className="marketplace-search-icon-button"
+        aria-label="Open marketplace menu"
+        title="Open marketplace menu"
+        tabIndex={visible ? 0 : -1}
+      >
+        <Menu className="h-5 w-5" aria-hidden="true" />
+      </button>
+      <label className="sr-only" htmlFor="marketplace-compact-query">Search marketplace</label>
+      <input
+        id="marketplace-compact-query"
+        type="search"
+        value={filters.query}
+        onChange={(event) => patchFilters({ query: event.target.value })}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") {
+            onSearchSubmit?.();
+          }
+        }}
+        className="marketplace-compact-search-input"
+        placeholder="Search RentOrbit..."
+        aria-label="Search marketplace"
+        tabIndex={visible ? 0 : -1}
+      />
+      <button
+        type="button"
+        onClick={onOpenMobileSettings}
+        className="marketplace-search-icon-button"
+        aria-label="Open search settings"
+        title="Open search settings"
+        tabIndex={visible ? 0 : -1}
+      >
+        <SlidersHorizontal className="h-5 w-5" aria-hidden="true" />
+      </button>
     </div>
   );
 }
@@ -1447,8 +1507,7 @@ function MarketplaceSearchSurface({
   onClearFilters,
   onSearchSubmit,
   onOpenMobileSettings,
-  onOpenMobileMenu,
-  onOpenMobileDetails
+  onOpenMobileMenu
 }: {
   filters: FilterState;
   patchFilters: (next: Partial<FilterState>) => void;
@@ -1459,10 +1518,10 @@ function MarketplaceSearchSurface({
   onSearchSubmit?: () => void;
   onOpenMobileSettings: () => void;
   onOpenMobileMenu: () => void;
-  onOpenMobileDetails: () => void;
 }) {
   const queryTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const hasAiTags = aiTags.length > 0;
+  const showClearFilters = hasMarketplaceSearchChanges(filters, aiTags);
 
   useEffect(() => {
     const textarea = queryTextareaRef.current;
@@ -1495,63 +1554,45 @@ function MarketplaceSearchSurface({
 
             <div className="marketplace-search-input-shell min-w-0 flex-1">
               <label className="sr-only" htmlFor="marketplace-search-query">Search marketplace</label>
-              <div className="flex min-w-0 items-start gap-2">
-                <textarea
-                  id="marketplace-search-query"
-                  ref={queryTextareaRef}
-                  value={filters.query}
-                  onChange={(event) => patchFilters({ query: event.target.value })}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" && !event.shiftKey) {
-                      event.preventDefault();
-                      onSearchSubmit?.();
-                    }
-                  }}
-                  rows={1}
-                  wrap="soft"
-                  enterKeyHint="search"
-                  className="marketplace-search-textarea min-h-11 min-w-0 flex-1 resize-none bg-transparent px-1 py-2 text-[clamp(0.95rem,1.2vw,1.12rem)] font-semibold leading-6 text-orbit-ink outline-none placeholder:text-orbit-ink/45 focus:outline-none focus:ring-0 focus-visible:outline-none"
-                  style={{ outline: "none" }}
-                  placeholder="Suggest a camera under KES 15000 near me with a crew..."
-                  aria-label="Search marketplace"
-                />
-                <button
-                  type="button"
-                  onClick={onOpenMobileSettings}
-                  className="marketplace-search-icon-button xl:hidden"
-                  aria-label="Open search settings"
-                  title="Open search settings"
-                >
-                  <SlidersHorizontal className="h-5 w-5" aria-hidden="true" />
-                </button>
-              </div>
+              <textarea
+                id="marketplace-search-query"
+                ref={queryTextareaRef}
+                value={filters.query}
+                onChange={(event) => patchFilters({ query: event.target.value })}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && !event.shiftKey) {
+                    event.preventDefault();
+                    onSearchSubmit?.();
+                  }
+                }}
+                rows={1}
+                wrap="soft"
+                enterKeyHint="search"
+                className="marketplace-search-textarea min-h-11 min-w-0 w-full resize-none bg-transparent px-1 py-2 text-[clamp(0.95rem,1.2vw,1.12rem)] font-semibold leading-6 text-orbit-ink outline-none placeholder:text-orbit-ink/45 focus:outline-none focus:ring-0 focus-visible:outline-none"
+                style={{ outline: "none" }}
+                placeholder="Suggest a camera under KES 15000 near me with a crew..."
+                aria-label="Search marketplace"
+              />
             </div>
+
+            <button
+              type="button"
+              onClick={onOpenMobileSettings}
+              className="marketplace-search-icon-button xl:hidden"
+              aria-label="Open search settings"
+              title="Open search settings"
+            >
+              <SlidersHorizontal className="h-5 w-5" aria-hidden="true" />
+            </button>
           </div>
 
           <SearchFilterControls
             filters={filters}
             patchFilters={patchFilters}
             className="hidden flex-wrap gap-2 xl:flex"
+            showClearFilters={showClearFilters}
+            onClearFilters={onClearFilters}
           />
-
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={onClearFilters}
-              className="marketplace-clear-filter-pill"
-            >
-              <RotateCcw className="h-4 w-4" aria-hidden="true" />
-              Clear filters
-            </button>
-            <button
-              type="button"
-              onClick={onOpenMobileDetails}
-              className="marketplace-mobile-details-pill xl:hidden"
-            >
-              <PackageCheck className="h-4 w-4" aria-hidden="true" />
-              Details
-            </button>
-          </div>
         </div>
 
         {hasAiTags ? (
@@ -1579,14 +1620,18 @@ function SearchSettingsPanel({
   onToggleAiTag: (tagId: string) => void;
   onClearFilters: () => void;
 }) {
+  const showClearFilters = hasMarketplaceSearchChanges(filters, aiTags);
+
   return (
-    <section className={cn(ui.surface, "grid gap-4 overflow-visible p-4")}>
-      <SearchFilterControls filters={filters} patchFilters={patchFilters} className="flex flex-wrap gap-2" />
+    <section className="marketplace-search-surface grid gap-4 overflow-visible rounded-[30px] p-4">
+      <SearchFilterControls
+        filters={filters}
+        patchFilters={patchFilters}
+        className="flex flex-wrap gap-2"
+        showClearFilters={showClearFilters}
+        onClearFilters={onClearFilters}
+      />
       <AiTagCluster aiTags={aiTags} onToggleAiTag={onToggleAiTag} />
-      <button type="button" onClick={onClearFilters} className="marketplace-clear-filter-pill justify-center">
-        <RotateCcw className="h-4 w-4" aria-hidden="true" />
-        Clear filters
-      </button>
     </section>
   );
 }
@@ -1594,11 +1639,15 @@ function SearchSettingsPanel({
 function SearchFilterControls({
   filters,
   patchFilters,
-  className
+  className,
+  showClearFilters = false,
+  onClearFilters
 }: {
   filters: FilterState;
   patchFilters: (next: Partial<FilterState>) => void;
   className?: string;
+  showClearFilters?: boolean;
+  onClearFilters?: () => void;
 }) {
   return (
     <div className={className}>
@@ -1636,6 +1685,12 @@ function SearchFilterControls({
         checked={filters.includeCountrywide}
         onChange={(checked) => patchFilters({ includeCountrywide: checked })}
       />
+      {showClearFilters && onClearFilters ? (
+        <button type="button" onClick={onClearFilters} className="marketplace-clear-filter-pill">
+          <RotateCcw className="h-4 w-4" aria-hidden="true" />
+          Clear filters
+        </button>
+      ) : null}
     </div>
   );
 }
@@ -1661,7 +1716,7 @@ function SearchFilterPill({
       labelClassName="sr-only"
       buttonClassName="marketplace-search-filter-pill"
       arrowClassName="marketplace-search-filter-arrow"
-      menuClassName="absolute left-0 top-[calc(100%+8px)] z-[70] min-w-full overflow-hidden rounded-[24px] bg-orbit-panel p-2 shadow-[0_18px_42px_rgba(25,32,29,0.14)]"
+      menuClassName="absolute left-0 top-[calc(100%+8px)] z-[120] min-w-full overflow-hidden rounded-[24px] bg-orbit-panel p-2 shadow-[0_18px_42px_rgba(25,32,29,0.14)]"
     />
   );
 }
@@ -1707,11 +1762,11 @@ function RadiusFilterPopover({ value, onChange }: { value: number; onChange: (va
       >
         <span className="min-w-0 flex-1 truncate">Radius {value} km</span>
         <span className="marketplace-search-filter-arrow">
-          <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
+          <ChevronDown className={cn("h-4 w-4 transition-transform", open ? "rotate-180" : "")} aria-hidden="true" />
         </span>
       </button>
       {open ? (
-        <div className="absolute left-0 top-[calc(100%+8px)] z-[70] w-[min(18rem,calc(100vw-2rem))] rounded-[24px] bg-orbit-panel p-4 shadow-[0_18px_42px_rgba(25,32,29,0.14)]">
+        <div className="absolute left-0 top-[calc(100%+8px)] z-[120] w-[min(18rem,calc(100vw-2rem))] rounded-[24px] bg-orbit-panel p-4 shadow-[0_18px_42px_rgba(25,32,29,0.14)]">
           <div className="flex items-center justify-between gap-3">
             <span className="text-xs font-black uppercase tracking-[0.08em] text-orbit-ink/58">Radius</span>
             <span className="text-sm font-black text-orbit-ink">{value} km</span>
