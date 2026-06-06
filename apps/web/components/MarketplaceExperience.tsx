@@ -25,8 +25,9 @@ import {
 } from "lucide-react";
 import { CustomSelect, type CustomSelectOption } from "@/components/CustomSelect";
 import { SiteHeader } from "@/components/SiteHeader";
+import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import type { AccountMode } from "@/components/AuthModal";
-import { readAccountSession } from "@/lib/accountSession";
+import { accountSessionUpdatedEvent, clearAccountSession, readAccountSession } from "@/lib/accountSession";
 import {
   readSearchIntelligenceSession,
   recordListingIntelligenceSignal,
@@ -491,6 +492,7 @@ export function MarketplaceExperience() {
   const [focusedThread, setFocusedThread] = useState<AccountChatThread | null>(null);
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authModalMode, setAuthModalMode] = useState<AccountMode>("signin");
+  const [accountSignedIn, setAccountSignedIn] = useState(false);
   const [pendingDmListingId, setPendingDmListingId] = useState<string | null>(null);
   const [savedListingIds, setSavedListingIds] = useState<string[]>([]);
   const [bookingQuantity, setBookingQuantity] = useState("1");
@@ -502,6 +504,7 @@ export function MarketplaceExperience() {
   const [compactSearchVisible, setCompactSearchVisible] = useState(false);
   const [mobileHeaderSearch, setMobileHeaderSearch] = useState(false);
   const marketplaceContentRef = useRef<HTMLElement | null>(null);
+  const desktopSearchSurfaceRef = useRef<HTMLDivElement | null>(null);
   const mobileSettingsButtonRef = useRef<HTMLButtonElement | null>(null);
   const searchRequestIdRef = useRef(0);
 
@@ -556,6 +559,21 @@ export function MarketplaceExperience() {
   }, []);
 
   useEffect(() => {
+    function refreshAccountSession() {
+      setAccountSignedIn(Boolean(readAccountSession()));
+    }
+
+    refreshAccountSession();
+    window.addEventListener("storage", refreshAccountSession);
+    window.addEventListener(accountSessionUpdatedEvent, refreshAccountSession);
+
+    return () => {
+      window.removeEventListener("storage", refreshAccountSession);
+      window.removeEventListener(accountSessionUpdatedEvent, refreshAccountSession);
+    };
+  }, []);
+
+  useEffect(() => {
     if (!mobileSettingsOpen && !mobileMenuOpen) return;
 
     const previousOverflow = document.body.style.overflow;
@@ -595,20 +613,29 @@ export function MarketplaceExperience() {
 
   useEffect(() => {
     const currentScroller = marketplaceContentRef.current;
-    if (currentScroller === null) {
+    const currentSearchSurface = desktopSearchSurfaceRef.current;
+    if (currentScroller === null || currentSearchSurface === null) {
       return;
     }
     const scroller: HTMLElement = currentScroller;
+    const searchSurface: HTMLElement = currentSearchSurface;
 
     function updateCompactSearch() {
-      setCompactSearchVisible(scroller.scrollTop > 36);
+      const searchSurfaceBottom = searchSurface.offsetTop + searchSurface.offsetHeight;
+      setCompactSearchVisible(scroller.scrollTop >= Math.max(0, searchSurfaceBottom - 2));
     }
 
     updateCompactSearch();
     scroller.addEventListener("scroll", updateCompactSearch, { passive: true });
+    window.addEventListener("resize", updateCompactSearch);
+    const resizeObserver = new ResizeObserver(updateCompactSearch);
+    resizeObserver.observe(scroller);
+    resizeObserver.observe(searchSurface);
 
     return () => {
       scroller.removeEventListener("scroll", updateCompactSearch);
+      window.removeEventListener("resize", updateCompactSearch);
+      resizeObserver.disconnect();
     };
   }, []);
 
@@ -969,6 +996,19 @@ export function MarketplaceExperience() {
     openFocusedDmListing(listing);
   }
 
+  function openMobileMenuAuth(mode: AccountMode) {
+    setAuthModalMode(mode);
+    setPendingDmListingId(null);
+    setMobileMenuOpen(false);
+    setAuthModalOpen(true);
+  }
+
+  function signOutFromMobileMenu() {
+    clearAccountSession();
+    setAccountSignedIn(false);
+    setMobileMenuOpen(false);
+  }
+
   function closeDmAuthModal() {
     setAuthModalOpen(false);
     setPendingDmListingId(null);
@@ -976,6 +1016,7 @@ export function MarketplaceExperience() {
 
   function handleDmAuthenticated() {
     const listingId = pendingDmListingId;
+    setAccountSignedIn(true);
     setAuthModalOpen(false);
     setPendingDmListingId(null);
 
@@ -1108,13 +1149,18 @@ export function MarketplaceExperience() {
 
       {mobileMenuOpen ? (
         <MarketplaceMenuDrawer onClose={() => setMobileMenuOpen(false)}>
-          <MarketplaceMobileMenu onClose={() => setMobileMenuOpen(false)} />
+          <MarketplaceMobileMenu
+            isSignedIn={accountSignedIn}
+            onClose={() => setMobileMenuOpen(false)}
+            onOpenAuth={openMobileMenuAuth}
+            onSignOut={signOutFromMobileMenu}
+          />
         </MarketplaceMenuDrawer>
       ) : null}
 
       <div className="grid min-h-[calc(100svh-81px)] min-w-0 w-full gap-3 px-3 py-3 xl:h-[calc(100svh-81px)] xl:grid-cols-[minmax(0,1fr)_360px] xl:overflow-hidden 2xl:grid-cols-[minmax(0,1fr)_380px]">
         <section ref={marketplaceContentRef} className="viewport-scroll-column grid min-w-0 content-start gap-3 xl:pr-1">
-          <div className="hidden xl:block">
+          <div ref={desktopSearchSurfaceRef} className="hidden xl:block">
             <MarketplaceSearchSurface
               filters={filters}
               patchFilters={patchFilters}
@@ -1420,6 +1466,61 @@ function MarketplaceMenuDrawer({
   onClose: () => void;
   children: React.ReactNode;
 }) {
+  const [dragOffset, setDragOffset] = useState(0);
+  const [dragging, setDragging] = useState(false);
+  const drawerRef = useRef<HTMLElement | null>(null);
+  const dragStartXRef = useRef<number | null>(null);
+  const dragOffsetRef = useRef(0);
+
+  function setDrawerDragOffset(nextOffset: number) {
+    dragOffsetRef.current = nextOffset;
+    setDragOffset(nextOffset);
+  }
+
+  function startDrawerDrag(event: React.PointerEvent<HTMLElement>) {
+    if (event.pointerType === "mouse" && event.button !== 0) {
+      return;
+    }
+
+    const target = event.target as HTMLElement;
+    if (target.closest("a, button, input, select, textarea, [role='button']")) {
+      return;
+    }
+
+    dragStartXRef.current = event.clientX;
+    setDragging(true);
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+
+  function moveDrawerDrag(event: React.PointerEvent<HTMLElement>) {
+    if (dragStartXRef.current === null) {
+      return;
+    }
+
+    setDrawerDragOffset(Math.min(0, event.clientX - dragStartXRef.current));
+  }
+
+  function finishDrawerDrag(event: React.PointerEvent<HTMLElement>) {
+    if (dragStartXRef.current === null) {
+      return;
+    }
+
+    const drawerWidth = drawerRef.current?.getBoundingClientRect().width ?? 1;
+    const shouldClose = Math.abs(dragOffsetRef.current) > Math.min(120, drawerWidth * 0.3);
+
+    dragStartXRef.current = null;
+    setDragging(false);
+    setDrawerDragOffset(0);
+
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+
+    if (shouldClose) {
+      onClose();
+    }
+  }
+
   return (
     <div className="marketplace-menu-drawer-layer" role="presentation">
       <button
@@ -1428,7 +1529,20 @@ function MarketplaceMenuDrawer({
         onClick={onClose}
         aria-label="Close marketplace menu"
       />
-      <aside className="marketplace-menu-drawer" role="dialog" aria-modal="true" aria-label="RentOrbit menu">
+      <aside
+        ref={drawerRef}
+        className="marketplace-menu-drawer"
+        role="dialog"
+        aria-modal="true"
+        aria-label="RentOrbit menu"
+        data-dragging={dragging ? "true" : "false"}
+        style={dragOffset ? { transform: `translate3d(${dragOffset}px, 0, 0)` } : undefined}
+        onPointerDown={startDrawerDrag}
+        onPointerMove={moveDrawerDrag}
+        onPointerUp={finishDrawerDrag}
+        onPointerCancel={finishDrawerDrag}
+      >
+        <div className="marketplace-menu-drawer-grip" aria-hidden="true" />
         <div className="flex items-center justify-between gap-3">
           <h2 className="truncate text-[clamp(0.95rem,4vw,1.25rem)] font-black text-orbit-ink">RentOrbit</h2>
           <button
@@ -1587,29 +1701,84 @@ function MarketplaceHeaderSearch({
   );
 }
 
-function MarketplaceMobileMenu({ onClose }: { onClose: () => void }) {
+function MarketplaceMobileMenu({
+  isSignedIn,
+  onClose,
+  onOpenAuth,
+  onSignOut
+}: {
+  isSignedIn: boolean;
+  onClose: () => void;
+  onOpenAuth: (mode: AccountMode) => void;
+  onSignOut: () => void;
+}) {
   const links = [
     { href: "/", label: "Home" },
     { href: "/marketplace", label: "Rent" },
-    { href: "/account?mode=signup", label: "List Your Item" },
-    { href: "/account", label: "Account" }
+    { href: "/account?mode=signup", label: "List Your Item" }
   ];
 
   return (
-    <nav className="grid gap-3" aria-label="Marketplace menu">
-      {links.map((link) => (
-        <Link
-          key={link.href}
-          href={link.href}
-          prefetch={false}
-          onClick={onClose}
-          className="marketplace-menu-link theme-body-border flex items-center justify-between rounded-full bg-orbit-panel font-black text-orbit-ink ring-1 ring-white/70"
-        >
-          {link.label}
-          <ArrowUpRight className="h-4 w-4 text-[#806A00]" aria-hidden="true" />
-        </Link>
-      ))}
-    </nav>
+    <div className="grid gap-4">
+      <nav className="grid gap-3" aria-label="Marketplace menu">
+        {links.map((link) => (
+          <Link
+            key={link.href}
+            href={link.href}
+            prefetch={false}
+            onClick={onClose}
+            className="marketplace-menu-link theme-body-border flex items-center justify-between rounded-full bg-orbit-panel font-black text-orbit-ink ring-1 ring-white/70"
+          >
+            {link.label}
+            <ArrowUpRight className="h-4 w-4 text-[#806A00]" aria-hidden="true" />
+          </Link>
+        ))}
+      </nav>
+
+      <div className="marketplace-menu-actions rounded-[28px] bg-orbit-panel/72 p-3 ring-1 ring-white/60">
+        <div className="marketplace-menu-theme-row">
+          <span className="text-[clamp(0.72rem,3vw,0.82rem)] font-black uppercase text-orbit-ink/55">Theme</span>
+          <ThemeSwitcher compact />
+        </div>
+
+        {isSignedIn ? (
+          <div className="marketplace-menu-auth-grid">
+            <Link
+              href="/account"
+              prefetch={false}
+              onClick={onClose}
+              className={cn(ui.panelPill, "marketplace-menu-auth-pill")}
+            >
+              Account
+            </Link>
+            <button
+              type="button"
+              onClick={onSignOut}
+              className={cn(ui.goldPill, "marketplace-menu-auth-pill")}
+            >
+              Sign out
+            </button>
+          </div>
+        ) : (
+          <div className="marketplace-menu-auth-grid">
+            <button
+              type="button"
+              onClick={() => onOpenAuth("signin")}
+              className={cn(ui.panelPill, "marketplace-menu-auth-pill")}
+            >
+              Sign In
+            </button>
+            <button
+              type="button"
+              onClick={() => onOpenAuth("signup")}
+              className={cn(ui.goldPill, "marketplace-menu-auth-pill")}
+            >
+              Sign Up
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -1932,11 +2101,7 @@ function AiTagCluster({
   className?: string;
 }) {
   if (aiTags.length === 0) {
-    return (
-      <div className={cn("marketplace-ai-tag-cluster rounded-[24px] bg-orbit-field/45 p-4 text-sm font-bold leading-6 text-orbit-ink/58", className)}>
-        Search tags will appear here after AI narrows the results.
-      </div>
-    );
+    return null;
   }
 
   return (

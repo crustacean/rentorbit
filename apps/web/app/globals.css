@@ -221,7 +221,9 @@ textarea:focus-visible {
 }
 
 .marketplace-search-surface--with-tags {
-  inline-size: 100%;
+  inline-size: fit-content;
+  max-inline-size: min(82rem, 100%);
+  min-inline-size: min(64rem, 100%);
 }
 
 .marketplace-search-input-shell {
@@ -243,9 +245,8 @@ textarea:focus-visible {
   align-self: stretch;
   flex: 0 0 auto;
   inline-size: max-content;
-  max-block-size: none;
-  max-inline-size: none;
-  min-inline-size: max-content;
+  max-inline-size: min(44vw, 44rem);
+  min-inline-size: min(22rem, 100%);
   overflow: visible;
 }
 
@@ -265,13 +266,16 @@ textarea:focus-visible {
 }
 
 .marketplace-ai-tags-inline .marketplace-ai-tag-list {
-  flex-wrap: nowrap;
+  align-content: flex-start;
+  flex-flow: column wrap;
+  max-block-size: clamp(4.5rem, 7vw, 5.75rem);
   overflow: visible;
-  white-space: nowrap;
+  white-space: normal;
 }
 
 .marketplace-ai-tags-inline .ai-filter-tag {
   flex: 0 0 auto;
+  inline-size: fit-content;
 }
 
 .marketplace-header-search {
@@ -532,6 +536,23 @@ textarea:focus-visible {
   min-inline-size: 0;
   overflow-y: auto;
   padding: clamp(0.75rem, 3vw, 1.25rem);
+  touch-action: pan-y;
+  transition: transform 180ms ease;
+  will-change: transform;
+}
+
+.marketplace-menu-drawer[data-dragging="true"] {
+  cursor: grabbing;
+  transition: none;
+}
+
+.marketplace-menu-drawer-grip {
+  background: rgb(var(--color-orbit-ink) / 0.18);
+  block-size: 0.25rem;
+  border-radius: 999px;
+  inline-size: clamp(2.4rem, 13vw, 3.5rem);
+  margin-block: 0 0.75rem;
+  margin-inline: auto;
 }
 
 .marketplace-menu-link {
@@ -540,6 +561,36 @@ textarea:focus-visible {
   min-block-size: clamp(2.75rem, 11vw, 3.5rem);
   min-inline-size: 0;
   padding-inline: clamp(0.85rem, 3.5vw, 1.25rem);
+}
+
+.marketplace-menu-actions {
+  display: grid;
+  gap: clamp(0.7rem, 2.8vw, 0.95rem);
+}
+
+.marketplace-menu-theme-row {
+  align-items: center;
+  display: flex;
+  gap: 0.75rem;
+  justify-content: space-between;
+  min-block-size: clamp(2.75rem, 11vw, 3.4rem);
+  min-inline-size: 0;
+}
+
+.marketplace-menu-auth-grid {
+  display: grid;
+  gap: clamp(0.5rem, 2vw, 0.75rem);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.marketplace-menu-auth-pill {
+  block-size: clamp(2.45rem, 10vw, 3rem);
+  min-block-size: 0;
+  min-inline-size: 0;
+  padding-inline: clamp(0.55rem, 2.4vw, 0.95rem);
+  text-align: center;
+  font-size: clamp(0.68rem, 2.9vw, 0.82rem);
+  white-space: nowrap;
 }
 
 .marketplace-filter-popover-layer {
