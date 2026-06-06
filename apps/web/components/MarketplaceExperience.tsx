@@ -1589,7 +1589,7 @@ function MarketplaceSearchSurface({
           <SearchFilterControls
             filters={filters}
             patchFilters={patchFilters}
-            className="hidden flex-wrap gap-2 xl:flex"
+            className="marketplace-filter-row hidden xl:flex"
             showClearFilters={showClearFilters}
             onClearFilters={onClearFilters}
           />
@@ -1627,7 +1627,7 @@ function SearchSettingsPanel({
       <SearchFilterControls
         filters={filters}
         patchFilters={patchFilters}
-        className="flex flex-wrap gap-2"
+        className="marketplace-filter-row flex"
         showClearFilters={showClearFilters}
         onClearFilters={onClearFilters}
       />
@@ -1712,7 +1712,7 @@ function SearchFilterPill({
       value={value}
       onChange={onChange}
       options={options}
-      className="relative min-w-[clamp(8rem,12vw,11rem)]"
+      className="marketplace-filter-control relative"
       labelClassName="sr-only"
       buttonClassName="marketplace-search-filter-pill"
       arrowClassName="marketplace-search-filter-arrow"
@@ -1752,7 +1752,7 @@ function RadiusFilterPopover({ value, onChange }: { value: number; onChange: (va
   }, [open]);
 
   return (
-    <div ref={wrapperRef} className="relative min-w-[clamp(8rem,12vw,11rem)]">
+    <div ref={wrapperRef} className="marketplace-filter-control relative">
       <button
         type="button"
         onClick={() => setOpen((current) => !current)}
@@ -1799,7 +1799,7 @@ function CountrywideDeliveryToggle({ checked, onChange }: { checked: boolean; on
       aria-pressed={checked}
     >
       <span className="marketplace-countrywide-thumb" aria-hidden="true" />
-      Countrywide
+      <span className="min-w-0 truncate">Delivery</span>
     </button>
   );
 }
