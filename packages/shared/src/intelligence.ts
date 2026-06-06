@@ -94,6 +94,7 @@ export type SearchIntelligenceTag = {
   color: string;
   textColor: string;
   matchCount: number;
+  weight: number;
 };
 
 export type SearchIntelligenceSession = {
@@ -655,7 +656,7 @@ export function buildSearchIntelligenceTags(
   recommendations: SearchIntelligenceRecommendation[],
   limit = 20
 ): SearchIntelligenceTag[] {
-  const counts = new Map<string, { label: string; count: number }>();
+  const counts = new Map<string, { label: string; count: number; weight: number }>();
 
   for (const recommendation of recommendations) {
     for (const label of recommendation.matchedTags) {
@@ -663,13 +664,14 @@ export function buildSearchIntelligenceTags(
       const current = counts.get(id);
       counts.set(id, {
         label,
-        count: (current?.count ?? 0) + 1
+        count: (current?.count ?? 0) + 1,
+        weight: (current?.weight ?? 0) + recommendation.score
       });
     }
   }
 
   return [...counts.entries()]
-    .sort((left, right) => right[1].count - left[1].count || left[1].label.localeCompare(right[1].label))
+    .sort((left, right) => right[1].weight - left[1].weight || right[1].count - left[1].count || left[1].label.localeCompare(right[1].label))
     .slice(0, limit)
     .map(([id, item], index) => {
       const palette = tagPalette[index % tagPalette.length] ?? tagPalette[0];
@@ -678,6 +680,7 @@ export function buildSearchIntelligenceTags(
         id,
         label: item.label,
         matchCount: item.count,
+        weight: Number(item.weight.toFixed(1)),
         color: palette.color,
         textColor: palette.textColor
       };

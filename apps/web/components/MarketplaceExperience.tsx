@@ -135,7 +135,16 @@ type AiTagState = {
   label: string;
   color: string;
   textColor: string;
+  matchCount: number;
+  weight: number;
   active: boolean;
+};
+
+type RadialAiTag = AiTagState & {
+  gridColumn: number;
+  gridRow: number;
+  shiftX: string;
+  shiftY: string;
 };
 
 const marketplaceThreadsKey = "rentorbit:marketplace-chat-threads";
@@ -320,6 +329,8 @@ function mergeAiTagStates(
           label: tag.label,
           color: previous?.color ?? tag.color,
           textColor: previous?.textColor ?? tag.textColor,
+          matchCount: tag.matchCount,
+          weight: tag.weight ?? tag.matchCount,
           active: previous?.active ?? true
         }
       ];
@@ -328,7 +339,65 @@ function mergeAiTagStates(
 }
 
 function activeAiTags(tags: SearchIntelligenceTag[], states: Record<string, AiTagState>): AiTagState[] {
-  return tags.map((tag) => states[tag.id] ?? { ...tag, active: true });
+  return tags.map((tag) => {
+    const previous = states[tag.id];
+
+    return {
+      id: tag.id,
+      label: tag.label,
+      color: previous?.color ?? tag.color,
+      textColor: previous?.textColor ?? tag.textColor,
+      matchCount: tag.matchCount,
+      weight: tag.weight ?? tag.matchCount,
+      active: previous?.active ?? true
+    };
+  });
+}
+
+function radialTagLayout(tags: AiTagState[]): { tags: RadialAiTag[]; columns: number; rows: number } {
+  const count = tags.length;
+  if (count === 0) {
+    return { tags: [], columns: 1, rows: 1 };
+  }
+
+  const columns = Math.min(5, Math.max(1, Math.ceil(Math.sqrt(count * 1.25))));
+  const rows = Math.ceil(count / columns);
+  const centerColumn = (columns - 1) / 2;
+  const centerRow = (rows - 1) / 2;
+  const slots = Array.from({ length: rows * columns }, (_, index) => {
+    const row = Math.floor(index / columns);
+    const column = index % columns;
+    const distance = (column - centerColumn) ** 2 + (row - centerRow) ** 2;
+    const angle = Math.atan2(row - centerRow, column - centerColumn);
+
+    return { row, column, distance, angle };
+  }).sort((left, right) => left.distance - right.distance || left.angle - right.angle);
+
+  const sortedTags = [...tags].sort((left, right) => {
+    const leftWeight = Number.isFinite(left.weight) ? left.weight : left.matchCount;
+    const rightWeight = Number.isFinite(right.weight) ? right.weight : right.matchCount;
+
+    return rightWeight - leftWeight || right.matchCount - left.matchCount || left.label.localeCompare(right.label);
+  });
+
+  return {
+    columns,
+    rows,
+    tags: sortedTags.map((tag, index) => {
+      const slot = slots[index] ?? slots[slots.length - 1] ?? { row: 0, column: 0 };
+      const jitterSeed = (index * 37 + count * 11) % 9;
+      const shiftX = `${(jitterSeed - 4) * 0.08}rem`;
+      const shiftY = `${(((jitterSeed * 5) % 9) - 4) * 0.05}rem`;
+
+      return {
+        ...tag,
+        gridColumn: slot.column + 1,
+        gridRow: slot.row + 1,
+        shiftX,
+        shiftY
+      };
+    })
+  };
 }
 
 function tagIdFromLabel(label: string): string {
@@ -2104,13 +2173,19 @@ function AiTagCluster({
     return null;
   }
 
+  const layout = radialTagLayout(aiTags);
+  const clusterStyle = {
+    "--radial-tag-columns": layout.columns,
+    "--radial-tag-rows": layout.rows
+  } as CSSProperties;
+
   return (
     <div className={cn("marketplace-ai-tag-cluster rounded-[24px] bg-orbit-field/45 p-4", className)}>
       <p className="marketplace-ai-tag-title mb-3 text-xs font-black uppercase tracking-wide text-orbit-ink/55">
         Click a tag to remove it from your search
       </p>
-      <div className="marketplace-ai-tag-list flex flex-wrap gap-2">
-        {aiTags.map((tag) => (
+      <div className="marketplace-ai-tag-list marketplace-ai-tag-radial" style={clusterStyle}>
+        {layout.tags.map((tag) => (
           <button
             key={tag.id}
             type="button"
@@ -2121,9 +2196,16 @@ function AiTagCluster({
               tag.active
                 ? {
                     backgroundColor: tag.color,
-                    color: tag.textColor
+                    color: tag.textColor,
+                    gridColumn: tag.gridColumn,
+                    gridRow: tag.gridRow,
+                    transform: `translate3d(${tag.shiftX}, ${tag.shiftY}, 0)`
                   }
-                : undefined
+                : {
+                    gridColumn: tag.gridColumn,
+                    gridRow: tag.gridRow,
+                    transform: `translate3d(${tag.shiftX}, ${tag.shiftY}, 0)`
+                  }
             }
             title={tag.active ? `Remove ${tag.label} from this search` : `Add ${tag.label} back to this search`}
           >

@@ -222,8 +222,8 @@ textarea:focus-visible {
 
 .marketplace-search-surface--with-tags {
   inline-size: fit-content;
-  max-inline-size: min(82rem, 100%);
-  min-inline-size: min(64rem, 100%);
+  max-inline-size: min(86rem, 100%);
+  min-inline-size: min(58rem, 100%);
 }
 
 .marketplace-search-input-shell {
@@ -239,14 +239,15 @@ textarea:focus-visible {
   font-size: clamp(0.58rem, 0.72cqi, 0.66rem);
   line-height: 1.2;
   padding: clamp(0.38rem, 0.78cqi, 0.62rem);
+  place-content: center;
 }
 
 .marketplace-ai-tags-inline {
-  align-self: stretch;
+  align-self: center;
   flex: 0 0 auto;
   inline-size: max-content;
-  max-inline-size: min(44vw, 44rem);
-  min-inline-size: min(22rem, 100%);
+  max-inline-size: min(48vw, 46rem);
+  min-inline-size: min(18rem, 100%);
   overflow: visible;
 }
 
@@ -266,16 +267,31 @@ textarea:focus-visible {
 }
 
 .marketplace-ai-tags-inline .marketplace-ai-tag-list {
-  align-content: flex-start;
-  flex-flow: column wrap;
-  max-block-size: clamp(4.5rem, 7vw, 5.75rem);
+  max-block-size: none;
+}
+
+.marketplace-ai-tag-radial {
+  align-items: center;
+  display: grid;
+  grid-template-columns: repeat(var(--radial-tag-columns, 1), max-content);
+  grid-template-rows: repeat(var(--radial-tag-rows, 1), max-content);
+  inline-size: max-content;
+  justify-content: center;
+  margin-inline: auto;
+  max-inline-size: 100%;
   overflow: visible;
+  place-content: center;
   white-space: normal;
 }
 
-.marketplace-ai-tags-inline .ai-filter-tag {
-  flex: 0 0 auto;
+.marketplace-ai-tag-radial .ai-filter-tag {
   inline-size: fit-content;
+  justify-self: center;
+  transition:
+    background-color 160ms ease,
+    color 160ms ease,
+    transform 180ms ease;
+  white-space: nowrap;
 }
 
 .marketplace-header-search {
@@ -354,16 +370,18 @@ textarea:focus-visible {
   appearance: none;
 }
 
-.marketplace-header-search-input::placeholder {
-  color: rgb(var(--color-orbit-ink) / 0.42);
+.marketplace-header-search-input:focus,
+.marketplace-header-search-input:focus-visible {
+  box-shadow: none;
+  outline: 0;
 }
 
-@media (max-width: 767px) {
-  .marketplace-header-search-input:focus,
-  .marketplace-header-search-input:focus-visible {
-    box-shadow: none;
-    outline: 0;
-  }
+.marketplace-header-search:focus-within {
+  outline: 0;
+}
+
+.marketplace-header-search-input::placeholder {
+  color: rgb(var(--color-orbit-ink) / 0.42);
 }
 
 .marketplace-search-icon-button {
