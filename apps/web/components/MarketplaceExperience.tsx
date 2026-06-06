@@ -1550,14 +1550,13 @@ function MarketplaceHeaderSearch({
       data-searching={searchBusy ? "true" : "false"}
     >
       <button
-        ref={settingsButtonRef}
         type="button"
-        onClick={onOpenMobileSettings}
+        onClick={onOpenMobileMenu}
         className="marketplace-header-search-button"
-        aria-label="Open search settings"
-        title="Open search settings"
+        aria-label="Open marketplace menu"
+        title="Open marketplace menu"
       >
-        <SlidersHorizontal className="h-5 w-5" aria-hidden="true" />
+        <Menu className="h-5 w-5" aria-hidden="true" />
       </button>
       <label className="sr-only" htmlFor="marketplace-header-query">Search marketplace</label>
       <input
@@ -1575,13 +1574,14 @@ function MarketplaceHeaderSearch({
         aria-label="Search marketplace"
       />
       <button
+        ref={settingsButtonRef}
         type="button"
-        onClick={onOpenMobileMenu}
+        onClick={onOpenMobileSettings}
         className="marketplace-header-search-button"
-        aria-label="Open marketplace menu"
-        title="Open marketplace menu"
+        aria-label="Open search settings"
+        title="Open search settings"
       >
-        <Menu className="h-5 w-5" aria-hidden="true" />
+        <SlidersHorizontal className="h-5 w-5" aria-hidden="true" />
       </button>
     </div>
   );

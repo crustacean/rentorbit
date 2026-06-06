@@ -99,7 +99,12 @@ textarea:focus-visible {
   grid-template-columns: minmax(0, 1fr);
 }
 
+.site-header-inner.site-header-inner-replacement {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .site-header-replacement {
+  grid-column: 1 / -1;
   inline-size: 100%;
   min-inline-size: 0;
 }
@@ -273,9 +278,12 @@ textarea:focus-visible {
   --marketplace-search-bg: rgb(var(--color-orbit-field) / 0.72);
   align-items: center;
   background: var(--marketplace-search-bg);
+  block-size: clamp(2.8rem, 11vw, 3.25rem);
   border-radius: 999px;
   display: grid;
   gap: clamp(0.35rem, 1.2vw, 0.65rem);
+  grid-auto-flow: column;
+  grid-auto-rows: 1fr;
   grid-template-columns: auto minmax(0, 1fr) auto;
   inline-size: 100%;
   isolation: isolate;
@@ -287,13 +295,26 @@ textarea:focus-visible {
 }
 
 .marketplace-header-search > * {
+  grid-row: 1;
   position: relative;
   z-index: 1;
 }
 
+.marketplace-header-search-button:first-of-type {
+  grid-column: 1;
+}
+
+.marketplace-header-search-input {
+  grid-column: 2;
+}
+
+.marketplace-header-search-button:last-of-type {
+  grid-column: 3;
+}
+
 .marketplace-header-search-button,
 .marketplace-header-search-input {
-  block-size: clamp(2.125rem, 9vw, 2.75rem);
+  block-size: 100%;
 }
 
 .marketplace-header-search-button {
@@ -319,7 +340,9 @@ textarea:focus-visible {
   font-weight: 800;
   min-inline-size: 0;
   outline: none;
+  overflow: hidden;
   padding-inline: 0.25rem;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -719,6 +742,10 @@ textarea:focus-visible {
 @media (max-width: 720px) {
   .site-header-inner {
     grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .site-header-inner.site-header-inner-replacement {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .site-header-nav {
