@@ -500,6 +500,7 @@ export function MarketplaceExperience() {
   const [aiTagsCleared, setAiTagsCleared] = useState(false);
   const [searchStatus, setSearchStatus] = useState<SearchStatus>("idle");
   const [compactSearchVisible, setCompactSearchVisible] = useState(false);
+  const [mobileHeaderSearch, setMobileHeaderSearch] = useState(false);
   const marketplaceContentRef = useRef<HTMLElement | null>(null);
   const searchRequestIdRef = useRef(0);
 
@@ -557,7 +558,9 @@ export function MarketplaceExperience() {
     if (!mobileSettingsOpen && !mobileMenuOpen) return;
 
     const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    if (mobileMenuOpen) {
+      document.body.style.overflow = "hidden";
+    }
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
@@ -573,6 +576,21 @@ export function MarketplaceExperience() {
       window.removeEventListener("keydown", handleKeyDown);
     };
   }, [mobileMenuOpen, mobileSettingsOpen]);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(max-width: 767px)");
+
+    function updateMobileHeaderSearch() {
+      setMobileHeaderSearch(mediaQuery.matches);
+    }
+
+    updateMobileHeaderSearch();
+    mediaQuery.addEventListener("change", updateMobileHeaderSearch);
+
+    return () => {
+      mediaQuery.removeEventListener("change", updateMobileHeaderSearch);
+    };
+  }, []);
 
   useEffect(() => {
     const currentScroller = marketplaceContentRef.current;
@@ -1046,23 +1064,29 @@ export function MarketplaceExperience() {
     }
   }
 
+  const showMarketplaceHeaderSearch = mobileHeaderSearch || compactSearchVisible;
+
   return (
     <main className="min-h-screen overflow-x-hidden bg-orbit-field">
-      <SiteHeader active="rent" />
-      <MarketplaceCompactSearchBar
-        visible={compactSearchVisible}
-        filters={filters}
-        patchFilters={patchFilters}
-        searchBusy={searchBusy}
-        onOpenMobileMenu={() => setMobileMenuOpen(true)}
-        onOpenMobileSettings={() => setMobileSettingsOpen(true)}
-        onSearchSubmit={() => {
-          setMobileSettingsOpen(false);
-        }}
+      <SiteHeader
+        active="rent"
+        replacementActive={showMarketplaceHeaderSearch}
+        replacementContent={(
+          <MarketplaceHeaderSearch
+            filters={filters}
+            patchFilters={patchFilters}
+            searchBusy={searchBusy}
+            onOpenMobileMenu={() => setMobileMenuOpen(true)}
+            onOpenMobileSettings={() => setMobileSettingsOpen(true)}
+            onSearchSubmit={() => {
+              setMobileSettingsOpen(false);
+            }}
+          />
+        )}
       />
 
       {mobileSettingsOpen ? (
-        <MobilePanelOverlay title="Search settings" onClose={() => setMobileSettingsOpen(false)}>
+        <MarketplaceFilterPopover onClose={() => setMobileSettingsOpen(false)}>
           <SearchSettingsPanel
             filters={filters}
             patchFilters={patchFilters}
@@ -1073,30 +1097,32 @@ export function MarketplaceExperience() {
               setMobileSettingsOpen(false);
             }}
           />
-        </MobilePanelOverlay>
+        </MarketplaceFilterPopover>
       ) : null}
 
       {mobileMenuOpen ? (
-        <MobilePanelOverlay title="RentOrbit" onClose={() => setMobileMenuOpen(false)}>
+        <MarketplaceMenuDrawer onClose={() => setMobileMenuOpen(false)}>
           <MarketplaceMobileMenu onClose={() => setMobileMenuOpen(false)} />
-        </MobilePanelOverlay>
+        </MarketplaceMenuDrawer>
       ) : null}
 
       <div className="grid min-h-[calc(100svh-81px)] min-w-0 w-full gap-3 px-3 py-3 xl:h-[calc(100svh-81px)] xl:grid-cols-[minmax(0,1fr)_360px] xl:overflow-hidden 2xl:grid-cols-[minmax(0,1fr)_380px]">
         <section ref={marketplaceContentRef} className="viewport-scroll-column grid min-w-0 content-start gap-3 xl:pr-1">
-          <MarketplaceSearchSurface
-            filters={filters}
-            patchFilters={patchFilters}
-            aiTags={visibleAiTags}
-            searchBusy={searchBusy}
-            onToggleAiTag={toggleAiTag}
-            onClearFilters={clearFilters}
-            onSearchSubmit={() => {
-              setMobileSettingsOpen(false);
-            }}
-            onOpenMobileSettings={() => setMobileSettingsOpen(true)}
-            onOpenMobileMenu={() => setMobileMenuOpen(true)}
-          />
+          <div className="hidden xl:block">
+            <MarketplaceSearchSurface
+              filters={filters}
+              patchFilters={patchFilters}
+              aiTags={visibleAiTags}
+              searchBusy={searchBusy}
+              onToggleAiTag={toggleAiTag}
+              onClearFilters={clearFilters}
+              onSearchSubmit={() => {
+                setMobileSettingsOpen(false);
+              }}
+              onOpenMobileSettings={() => setMobileSettingsOpen(true)}
+              onOpenMobileMenu={() => setMobileMenuOpen(true)}
+            />
+          </div>
 
           <div className="grid gap-3">
             <div className="rounded-[30px] bg-orbit-panel/35 p-3">
@@ -1381,35 +1407,64 @@ function EmptyRecommendationCard({
   );
 }
 
-function MobilePanelOverlay({
-  title,
+function MarketplaceMenuDrawer({
   onClose,
   children
 }: {
-  title: string;
   onClose: () => void;
   children: React.ReactNode;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-orbit-field" role="dialog" aria-modal="true" aria-label={title}>
-      <div className="theme-body-border flex min-h-16 items-center justify-between border-b border-white/70 bg-orbit-panel/90 px-4">
-        <h2 className="text-lg font-black text-orbit-ink">{title}</h2>
-        <button
-          type="button"
-          onClick={onClose}
-          className="flex h-11 w-11 items-center justify-center rounded-full bg-orbit-soft/85 text-orbit-ink focus-visible:outline-none"
-          aria-label="Close panel"
-        >
-          <X className="h-5 w-5" aria-hidden="true" />
-        </button>
-      </div>
-      <div className="min-h-0 flex-1 overflow-y-auto p-3">{children}</div>
+    <div className="marketplace-menu-drawer-layer" role="presentation">
+      <button
+        type="button"
+        className="marketplace-menu-drawer-backdrop"
+        onClick={onClose}
+        aria-label="Close marketplace menu"
+      />
+      <aside className="marketplace-menu-drawer" role="dialog" aria-modal="true" aria-label="RentOrbit menu">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="truncate text-[clamp(0.95rem,4vw,1.25rem)] font-black text-orbit-ink">RentOrbit</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="marketplace-header-search-button"
+            aria-label="Close menu"
+            title="Close menu"
+          >
+            <X className="h-4 w-4" aria-hidden="true" />
+          </button>
+        </div>
+        <div className="min-h-0 overflow-y-auto pt-4">{children}</div>
+      </aside>
     </div>
   );
 }
 
-function MarketplaceCompactSearchBar({
-  visible,
+function MarketplaceFilterPopover({
+  onClose,
+  children
+}: {
+  onClose: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="marketplace-filter-popover-layer" role="presentation">
+      <button
+        type="button"
+        className="marketplace-filter-popover-dismiss"
+        onClick={onClose}
+        aria-label="Close search filters"
+      />
+      <section className="marketplace-filter-popover" role="dialog" aria-modal="false" aria-label="Search filters">
+        <div className="marketplace-filter-popover-arrow" aria-hidden="true" />
+        <div className="max-h-[min(70svh,34rem)] overflow-y-auto">{children}</div>
+      </section>
+    </div>
+  );
+}
+
+function MarketplaceHeaderSearch({
   filters,
   patchFilters,
   searchBusy,
@@ -1417,7 +1472,6 @@ function MarketplaceCompactSearchBar({
   onOpenMobileSettings,
   onSearchSubmit
 }: {
-  visible: boolean;
   filters: FilterState;
   patchFilters: (next: Partial<FilterState>) => void;
   searchBusy: boolean;
@@ -1427,24 +1481,21 @@ function MarketplaceCompactSearchBar({
 }) {
   return (
     <div
-      className="marketplace-compact-search-bar"
-      data-visible={visible ? "true" : "false"}
+      className="marketplace-header-search"
       data-searching={searchBusy ? "true" : "false"}
-      aria-hidden={!visible}
     >
       <button
         type="button"
         onClick={onOpenMobileMenu}
-        className="marketplace-search-icon-button"
+        className="marketplace-header-search-button"
         aria-label="Open marketplace menu"
         title="Open marketplace menu"
-        tabIndex={visible ? 0 : -1}
       >
         <Menu className="h-5 w-5" aria-hidden="true" />
       </button>
-      <label className="sr-only" htmlFor="marketplace-compact-query">Search marketplace</label>
+      <label className="sr-only" htmlFor="marketplace-header-query">Search marketplace</label>
       <input
-        id="marketplace-compact-query"
+        id="marketplace-header-query"
         type="search"
         value={filters.query}
         onChange={(event) => patchFilters({ query: event.target.value })}
@@ -1453,18 +1504,16 @@ function MarketplaceCompactSearchBar({
             onSearchSubmit?.();
           }
         }}
-        className="marketplace-compact-search-input"
+        className="marketplace-header-search-input"
         placeholder="Search RentOrbit..."
         aria-label="Search marketplace"
-        tabIndex={visible ? 0 : -1}
       />
       <button
         type="button"
         onClick={onOpenMobileSettings}
-        className="marketplace-search-icon-button"
+        className="marketplace-header-search-button"
         aria-label="Open search settings"
         title="Open search settings"
-        tabIndex={visible ? 0 : -1}
       >
         <SlidersHorizontal className="h-5 w-5" aria-hidden="true" />
       </button>
@@ -1488,7 +1537,7 @@ function MarketplaceMobileMenu({ onClose }: { onClose: () => void }) {
           href={link.href}
           prefetch={false}
           onClick={onClose}
-          className="theme-body-border flex min-h-14 items-center justify-between rounded-full bg-orbit-panel px-5 text-sm font-black text-orbit-ink ring-1 ring-white/70"
+          className="marketplace-menu-link theme-body-border flex items-center justify-between rounded-full bg-orbit-panel font-black text-orbit-ink ring-1 ring-white/70"
         >
           {link.label}
           <ArrowUpRight className="h-4 w-4 text-[#806A00]" aria-hidden="true" />
@@ -1627,7 +1676,7 @@ function SearchSettingsPanel({
       <SearchFilterControls
         filters={filters}
         patchFilters={patchFilters}
-        className="marketplace-filter-row flex"
+        className="marketplace-filter-row marketplace-filter-row--popover flex"
         showClearFilters={showClearFilters}
         onClearFilters={onClearFilters}
       />

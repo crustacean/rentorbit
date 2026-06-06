@@ -3,7 +3,7 @@
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import type { AccountMode } from "@/components/AuthModal";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import { accountSessionUpdatedEvent, clearAccountSession, readAccountSession } from "@/lib/accountSession";
@@ -19,6 +19,8 @@ type SiteHeaderProps = {
   active?: SiteHeaderActive;
   sessionEmail?: string | null;
   onSignOut?: () => void;
+  replacementActive?: boolean;
+  replacementContent?: ReactNode;
 };
 
 function navLinkClass(active: boolean) {
@@ -27,7 +29,13 @@ function navLinkClass(active: boolean) {
     : "site-header-nav-link font-bold text-orbit-ink/62 transition-colors hover:text-orbit-green";
 }
 
-export function SiteHeader({ active = "home", sessionEmail, onSignOut }: SiteHeaderProps) {
+export function SiteHeader({
+  active = "home",
+  sessionEmail,
+  onSignOut,
+  replacementActive = false,
+  replacementContent
+}: SiteHeaderProps) {
   const router = useRouter();
   const [detectedSessionEmail, setDetectedSessionEmail] = useState<string | null>(null);
   const [authModalOpen, setAuthModalOpen] = useState(false);
@@ -38,6 +46,7 @@ export function SiteHeader({ active = "home", sessionEmail, onSignOut }: SiteHea
   const controlled = sessionEmail !== undefined;
   const currentSessionEmail = controlled ? sessionEmail : detectedSessionEmail;
   const isSignedIn = Boolean(currentSessionEmail);
+  const showReplacement = Boolean(replacementActive && replacementContent);
 
   useEffect(() => {
     if (controlled) {
@@ -85,67 +94,73 @@ export function SiteHeader({ active = "home", sessionEmail, onSignOut }: SiteHea
   return (
     <>
       <header className="theme-body-border sticky top-0 z-50 border-b border-orbit-line/35 bg-orbit-field/78 backdrop-blur-xl">
-        <div className="site-header-inner mx-auto grid w-full max-w-7xl items-center">
-          <Link href="/" className="site-header-logo min-w-0 shrink font-black leading-none text-orbit-green" aria-label="RentOrbit home">
-            RentOrbit
-          </Link>
-
-          <nav className="site-header-nav items-center justify-center" aria-label="Primary">
-            <Link href="/marketplace" prefetch={false} className={navLinkClass(active === "rent")}>
-              Rent
-            </Link>
-            {isSignedIn ? (
-              <Link href="/account" prefetch={false} className={navLinkClass(active === "account")}>
-                List Your Item
+        <div className={cn("site-header-inner mx-auto grid w-full max-w-7xl items-center", showReplacement && "site-header-inner-replacement")}>
+          {showReplacement ? (
+            <div className="site-header-replacement min-w-0">{replacementContent}</div>
+          ) : (
+            <>
+              <Link href="/" className="site-header-logo min-w-0 shrink font-black leading-none text-orbit-green" aria-label="RentOrbit home">
+                RentOrbit
               </Link>
-            ) : (
-              <button
-                type="button"
-                onClick={() => openAuthModal("signup", "account")}
-                className={`${navLinkClass(active === "account")} focus-visible:outline-none`}
-              >
-                List Your Item
-              </button>
-            )}
-          </nav>
 
-          <div className="site-header-actions flex min-w-0 shrink-0 items-center">
-            <ThemeSwitcher compact />
-            {isSignedIn ? (
-              <Link
-                href="/account"
-                prefetch={false}
-                className={cn(ui.panelPill, "site-header-auth-pill")}
-              >
-                Account
-              </Link>
-            ) : (
-              <button
-                type="button"
-                onClick={() => openAuthModal("signin")}
-                className={cn(ui.panelPill, "site-header-auth-pill")}
-              >
-                Sign In
-              </button>
-            )}
-            {isSignedIn ? (
-              <button
-                type="button"
-                onClick={handleSignOut}
-                className={cn(ui.goldPill, "site-header-auth-pill")}
-              >
-                Sign out
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => openAuthModal("signup")}
-                className={cn(ui.goldPill, "site-header-auth-pill")}
-              >
-                Sign Up
-              </button>
-            )}
-          </div>
+              <nav className="site-header-nav items-center justify-center" aria-label="Primary">
+                <Link href="/marketplace" prefetch={false} className={navLinkClass(active === "rent")}>
+                  Rent
+                </Link>
+                {isSignedIn ? (
+                  <Link href="/account" prefetch={false} className={navLinkClass(active === "account")}>
+                    List Your Item
+                  </Link>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => openAuthModal("signup", "account")}
+                    className={`${navLinkClass(active === "account")} focus-visible:outline-none`}
+                  >
+                    List Your Item
+                  </button>
+                )}
+              </nav>
+
+              <div className="site-header-actions flex min-w-0 shrink-0 items-center">
+                <ThemeSwitcher compact />
+                {isSignedIn ? (
+                  <Link
+                    href="/account"
+                    prefetch={false}
+                    className={cn(ui.panelPill, "site-header-auth-pill")}
+                  >
+                    Account
+                  </Link>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => openAuthModal("signin")}
+                    className={cn(ui.panelPill, "site-header-auth-pill")}
+                  >
+                    Sign In
+                  </button>
+                )}
+                {isSignedIn ? (
+                  <button
+                    type="button"
+                    onClick={handleSignOut}
+                    className={cn(ui.goldPill, "site-header-auth-pill")}
+                  >
+                    Sign out
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => openAuthModal("signup")}
+                    className={cn(ui.goldPill, "site-header-auth-pill")}
+                  >
+                    Sign Up
+                  </button>
+                )}
+              </div>
+            </>
+          )}
         </div>
       </header>
 
