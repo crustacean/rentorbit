@@ -60,7 +60,7 @@ export function HomeLanding() {
               value={searchTerm}
               onChange={(event) => setSearchTerm(event.target.value)}
               className="min-w-0 flex-1 bg-transparent px-2 text-sm font-semibold text-orbit-ink placeholder:text-orbit-ink/45 focus:outline-none focus-visible:outline-none sm:text-base"
-              placeholder="What do you need today? Cameras, tools, cars..."
+              placeholder="Ask AI..."
               aria-label="Search marketplace"
             />
             <button

@@ -1753,7 +1753,7 @@ function MarketplaceHeaderSearch({
           }
         }}
         className="marketplace-header-search-input"
-        placeholder="Search RentOrbit..."
+        placeholder="Ask AI..."
         aria-label="Search marketplace"
       />
       <button
@@ -1926,7 +1926,7 @@ function MarketplaceSearchSurface({
                 enterKeyHint="search"
                 className="marketplace-search-textarea min-h-11 min-w-0 w-full resize-none bg-transparent px-1 py-2 text-[clamp(0.95rem,1.2vw,1.12rem)] font-semibold leading-6 text-orbit-ink outline-none placeholder:text-orbit-ink/45 focus:outline-none focus:ring-0 focus-visible:outline-none"
                 style={{ outline: "none" }}
-                placeholder="Suggest a camera under KES 15000 near me with a crew..."
+                placeholder="Ask AI..."
                 aria-label="Search marketplace"
               />
             </div>
